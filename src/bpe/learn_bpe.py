@@ -36,14 +36,20 @@ def create_parser():
 
     return parser
 
-def get_vocabulary(fobj):
+
+def get_vocabulary(fobj, nb_lines=None):
     """Read text and return dictionary that encodes vocabulary
     """
     vocab = Counter()
-    for line in fobj:
+    for index, line in enumerate(fobj):
+        if nb_lines is not None and index >= nb_lines:
+            break
+
         for word in line.strip().split(" "):
             vocab[word] += 1
+
     return vocab
+
 
 def update_pair_statistics(pair, changed, stats, indices):
     """Minimally update the indices and frequency of symbol pairs
