@@ -4,6 +4,7 @@ import operator
 import json
 import logging
 import sys
+from typing import List, Tuple
 
 from src.bpe import learn_bpe
 
@@ -29,7 +30,7 @@ def build_word_vocab(fn, voc_limit=None, max_nb_ex=None):
     return voc
 
 
-def build_bpe_vocab(fn, voc_limit: int, max_nb_ex: int=None) -> None:
+def build_bpe_vocab(fn, voc_limit: int, max_nb_ex: int=None) -> List[Tuple]:
     with open(fn, 'r') as f:
         rules = learn_bpe.learn(f, symbols=voc_limit, nb_lines=max_nb_ex)
         return rules
