@@ -36,14 +36,20 @@ def create_parser():
 
     return parser
 
-def get_vocabulary(fobj):
+
+def get_vocabulary(fobj, nb_lines=None):
     """Read text and return dictionary that encodes vocabulary
     """
     vocab = Counter()
-    for line in fobj:
+    for index, line in enumerate(fobj):
+        if nb_lines is not None and index >= nb_lines:
+            break
+
         for word in line.strip().split(" "):
             vocab[word] += 1
+
     return vocab
+
 
 def update_pair_statistics(pair, changed, stats, indices):
     """Minimally update the indices and frequency of symbol pairs
@@ -144,6 +150,7 @@ def replace_pair(pair, vocab, indices):
 
     return changes
 
+
 def prune_stats(stats, big_stats, threshold):
     """Prune statistics dict for efficiency of max()
 
@@ -160,9 +167,9 @@ def prune_stats(stats, big_stats, threshold):
                 big_stats[item] = freq
 
 
-def learn(data, symbols: int, verbose: bool=False) -> List[Tuple]:
+def learn(data, symbols: int, verbose: bool=False, nb_lines: int=None) -> List[Tuple]:
     rules = []
-    vocab = get_vocabulary(data)
+    vocab = get_vocabulary(data, nb_lines=nb_lines)
     vocab = dict([(tuple(x)+('</w>',) ,y) for (x,y) in vocab.items()])
     sorted_vocab = sorted(vocab.items(), key=lambda x: x[1], reverse=True)
 
