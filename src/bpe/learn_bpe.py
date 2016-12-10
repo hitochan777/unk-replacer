@@ -150,6 +150,7 @@ def replace_pair(pair, vocab, indices):
 
     return changes
 
+
 def prune_stats(stats, big_stats, threshold):
     """Prune statistics dict for efficiency of max()
 
