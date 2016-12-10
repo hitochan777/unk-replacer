@@ -166,9 +166,9 @@ def prune_stats(stats, big_stats, threshold):
                 big_stats[item] = freq
 
 
-def learn(data, symbols: int, verbose: bool=False) -> List[Tuple]:
+def learn(data, symbols: int, verbose: bool=False, nb_lines: int=None) -> List[Tuple]:
     rules = []
-    vocab = get_vocabulary(data)
+    vocab = get_vocabulary(data, nb_lines=nb_lines)
     vocab = dict([(tuple(x)+('</w>',) ,y) for (x,y) in vocab.items()])
     sorted_vocab = sorted(vocab.items(), key=lambda x: x[1], reverse=True)
 
