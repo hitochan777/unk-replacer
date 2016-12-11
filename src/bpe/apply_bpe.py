@@ -13,6 +13,7 @@ import sys
 import argparse
 from collections import defaultdict
 
+
 class BPE(object):
 
     def __init__(self, codes, separator='@@', use_separator=False, unk_symbol="<unk>", eow="</w>"):
@@ -28,7 +29,7 @@ class BPE(object):
                 self.bpe_subwords.append(''.join(item))
 
         # some hacking to deal with duplicates (only consider first instance)
-        self.bpe_codes = dict([(code,i) for (i,code) in reversed(list(enumerate(self.bpe_codes)))])
+        self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
 
         self.separator = separator
         self.use_separator = use_separator
@@ -66,6 +67,7 @@ class BPE(object):
         
         return ' '.join(output)
 
+
 def create_parser():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -101,6 +103,7 @@ def create_parser():
 
     return parser
 
+
 def get_pairs(word):
     """Return set of symbol pairs in a word.
 
@@ -112,6 +115,7 @@ def get_pairs(word):
         pairs.add((prev_char, char))
         prev_char = char
     return pairs
+
 
 def encode(orig, bpe_codes, cache={}):
     """Encode word based on list of BPE merge operations, which are applied consecutively

@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+import bisect
 
 from typing import Iterator, Union, Dict, Tuple, List
 
@@ -65,10 +66,10 @@ class Alignment(object):
         group_dict = defaultdict(lambda: ([], []))  # type: Dict[int, Tuple[List[int], List[int]]]
         assert len(e_groups) == tgt_len
         for index, group in enumerate(f_groups):
-            group_dict[group][0].append(index)
+            bisect.insort_left(group_dict[group][0], index)  # guarantee indices are in ascending order
 
         for index, group in enumerate(e_groups):
-            group_dict[group][1].append(index)
+            bisect.insort_left(group_dict[group][1], index)  # guarantee indices are in ascending order
 
         scc = list(group_dict.values())
 
