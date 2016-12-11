@@ -40,6 +40,16 @@ class Replacer:
         self.src_bpe = src_bpe  # type: BPE
         self.tgt_bpe = tgt_bpe  # type: BPE
 
+    def export_memory(self, output: str) -> None:
+        if path.isfile(output):
+            print("%s will be overwritten. Press Enter to proceed." % (output,))
+
+        logger.info("Writing replacement of size %d to %s... Wait patiently..." % (len(self.memory), output))
+        with open(output, "w") as f:
+            json.dump(f, self.memory)
+
+        logger.info("Finished exporting memory")
+
     @staticmethod
     def is_contiguous(seq: List[int]) -> bool:
         if len(seq) == 0:
