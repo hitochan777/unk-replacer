@@ -57,10 +57,7 @@ class BPE(object):
                 output.append(self._process_unk(item) + self.separator)
 
             last_token = self._process_unk(new_word[-1])
-            if last_token == self.eow:
-                if len(output) > 0 and output[-1].endswith(self.separator):
-                    prev_token = output.pop()
-                    output.append(prev_token[:-len(self.separator)])
+            output.append(last_token)
         else:
             for item in new_word:
                 output.append(self._process_unk(item))
