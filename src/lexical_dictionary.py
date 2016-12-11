@@ -16,15 +16,18 @@ class LexicalDictionary:
 
     def filter_vocab(self, dic):
         assert self.vocab is not None
+
         filtered_vocab = []
         for word in dic:
-            if len(self.get_translations(word)) > 0:
+            if len(self.get_translations(word, only_in_vocab=True)) > 0:
                 filtered_vocab.append(word)
 
         return filtered_vocab
 
     def set_vocab(self, vocab):
         # assert isinstance(vocab, dict), "vocab must be an instance of subclass of dict"
+        if isinstance(vocab, list):
+            vocab = set(vocab)
 
         self.vocab = vocab
 

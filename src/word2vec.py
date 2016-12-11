@@ -71,7 +71,7 @@ class Word2Vec:
 
         except KeyError:
             logger.info("%s not found in word2vec model" % word)
-            return [MostSimilar(word, 1.0)]
+            return []
 
     def set_vocab(self, vocab: List[str], topn: int=10000):
         assert self.model is not None
