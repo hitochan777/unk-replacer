@@ -4,8 +4,11 @@ import numpy as np
 from gensim import matutils
 from gensim.models.word2vec import Word2Vec as GensimWord2Vec
 from typing import Iterable, Optional, List
+from collections import namedtuple
 
 logger = logging.getLogger(__name__)
+
+MostSimilar = namedtuple('MostSimilar', 'word similarity')
 
 
 class SentenceGenerator(object):
@@ -59,13 +62,16 @@ class Word2Vec:
             word_vec = self.model.syn0norm[self.model.vocab[word].index]
             dists = np.dot(self.syn0norm_in_vocab, word_vec)
             best_ids = matutils.argsort(dists, topn=topn+1, reverse=True)
-            result = [(self.vocab[best_id], float(dists[best_id])) for best_id in best_ids if self.vocab[best_id] != word]
+            result = [MostSimilar(self.vocab[best_id], float(dists[best_id])) for best_id in best_ids if self.vocab[best_id] != word]
             assert all(vocab in self.vocab for vocab, dist in result)
+            if word in self.vocab:
+                return [MostSimilar(word, 1.0)] + result[:topn]
+
             return result[:topn]
 
         except KeyError:
             logger.info("%s not found in word2vec model" % word)
-            return [(word, 1.0)]
+            return [MostSimilar(word, 1.0)]
 
     def set_vocab(self, vocab: List[str], topn: int=10000):
         assert self.model is not None

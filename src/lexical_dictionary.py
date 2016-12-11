@@ -1,8 +1,10 @@
 import heapq
 from collections import defaultdict
+from collections import namedtuple
 import logging
 
 logger = logging.getLogger(__name__)
+Translation = namedtuple('Translation', 'word prob')
 
 
 class LexicalDictionary:
@@ -49,9 +51,9 @@ class LexicalDictionary:
 
             if only_in_vocab:
                 if word in self.vocab:
-                    topn_entries.append((word, prob))
+                    topn_entries.append(Translation(word, prob))
             else:
-                topn_entries.append((word, prob))
+                topn_entries.append(Translation(word, prob))
 
         assert topn is None or len(topn_entries) <= topn
 

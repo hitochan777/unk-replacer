@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+from collections import namedtuple
 from itertools import zip_longest
 from itertools import groupby
 import logging
@@ -15,14 +16,8 @@ from src.word2vec import Word2Vec
 
 logger = logging.getLogger(__name__)
 
-
-class Replacement:
-    def __init__(self, src_before: str=None, src_after: str=None,
-                 tgt_before=None, tgt_after=None):
-        self.src_before = src_before
-        self.src_after = src_after
-        self.tgt_before = tgt_before
-        self.tgt_after = tgt_after
+Candidate = namedtuple('Candidate', 'src_word tgt_word cos_sim lex_prob')
+Replacement = namedtuple('Replacement', 'src_before tgt_before src_after tgt_after')
 
 
 class Replacer:
@@ -95,74 +90,170 @@ class Replacer:
                 e_index = e_indices[0]
                 new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
                 new_tgt_seq[e_index] = new_tgt
+                continue
 
             if len(e_indices) == 0:  # null alignment
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
                 new_src = self.apply_bpe_source(src[f_index])  # type: str
                 new_src_seq[f_index] = new_src
+                self.memory[Replacement(src[0], None, new_src, None)] += 1
+                continue
 
             if len(f_indices) == 1 and len(e_indices) == 1:  # one-to-one alignment
                 f_index, e_index = f_indices[0], e_indices[0]
-                replacement = self.one_to_one_replace(f_index, e_index, src, tgt)
-                if replacement.succeed:
+                success, (new_src, new_tgt) = self.one_to_one_replace(src[f_index], tgt[e_index])
+                new_src_seq[f_index] = new_src
+                new_tgt_seq[e_index] = new_tgt
+                self.memory[Replacement(src[f_index], tgt[e_index], new_src, new_tgt)] += 1
+                if success:
                     continue
 
             if len(f_indices) == 1 and len(e_indices) > 1 and self.is_contiguous(e_indices):  # one-to-many
-                # TODO: one-to-many replacer
                 f_index = f_indices[0]
-                replacement = self.one_to_many_replace(f_index, e_indices[0], e_indices[-1], src, tgt)
+                success, (new_src, new_tgt) = self.one_to_many_replace(src[f_index], tgt[e_indices[0]:e_indices[-1]+1])
+                new_src_seq[f_index] = new_src
+                new_tgt_seq[e_indices[0]:e_index[-1]+1] = [None] * len(e_indices)
+                new_tgt_seq[e_indices[0]] = new_tgt
+                orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
+                self.memory[Replacement(src[f_index], orig_tgt_string, new_src, new_tgt)] += 1
+                if success:
+                    continue
 
             if len(f_indices) > 1 and len(e_indices) == 1 and self.is_contiguous(f_indices):  # many-to-one
-                # TODO: many-to-one replacer
                 e_index = e_indices[0]
-                replacement = self.many_to_one_replace(f_indices[0], f_indices[-1], e_index, src, tgt)
+                success, replacement = self.many_to_one_replace(f_indices[0], f_indices[-1], e_index, src, tgt)
+                new_src_seq[f_indices[0]:f_indices[-1]+1] = [None] * len(f_indices)
+                new_src_seq[f_indices[0]] = new_src
+                new_tgt_seq[e_index] = new_tgt
+                orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
+                self.memory[Replacement(orig_src_string, tgt[e_index], new_src, new_tgt)] += 1
+                if success:
+                    continue
 
-            assert len(f_indices) > 0 and len(e_indices) > 0
+            if len(f_indices) > 1 and len(e_indices) > 1:  # many-to-many
+                if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):
+                    new_src = self.apply_bpe_source(src[f_indices[0]:f_indices[-1]+1])
+                    new_tgt = self.apply_bpe_target(tgt[e_indices[0]:e_indices[-1]+1])
+                    new_src_seq[f_indices[0]:f_indices[-1]+1] = [None] * len(f_indices)
+                    new_src_seq[f_indices[0]] = new_src
+                    new_tgt_seq[e_indices[0]:e_indices[-1]+1] = [None] * len(e_indices)
+                    new_tgt_seq[e_indices[0]] = new_tgt
+                    # TODO: save in memory
+                else:
+                    pass
+            else:  # garbage collector
+                if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):
+                    # TODO: save in memory
+                    pass
+                else:
+                    pass
 
-        # new_src = filter(None, fwords)
-        # new_tgt = filter(None, ewords)
-        return new_src, new_tgt
+        new_src_seq = list(filter(None, new_src_seq))
+        new_tgt_seq = list(filter(None, new_tgt_seq))
+        return new_src_seq, new_tgt_seq
 
-    def one_to_one_replace(self, f_index, e_index, src, tgt) -> Tuple[bool, Replacement]:
+    def get_best_candidate(self, src: List[str], tgt: List[str], candidates: List[Candidate]) -> Tuple[str, str]:
+        """
+        candidates must be sorted by cos_sim, and then lex_prob in the descending order
+        """
+        best_pair = None
+        best_score = 0.0
+        assert not(len(src) > 1 and len(tgt) > 1), "At least one side has only one word"
+        for candidate in candidates:
+            src_word, tgt_word = candidate.src_word, candidate.tgt_word
+            assert len(src_word) == 1 and len(tgt_word) == 1
+            lex_prob = candidate.lex_prob
+
+            if len(src) == 1 and len(tgt) == 1:
+                src_sim = candidate.cos_sim
+                tgt_sim = self.tgt_embedding.similarity(tgt_word, tgt[0])
+                score = (src_sim + tgt_sim) * lex_prob
+
+            elif len(src) == 1 and len(tgt) > 1:
+                src_sim = candidate.cos_sim
+                score = src_sim * lex_prob
+
+            elif len(src) > 1 and len(tgt) == 1:
+                tgt_sim = candidate.cos_sim
+                score = tgt_sim * lex_prob
+            else:
+                raise RuntimeError("Unexpected Error")
+
+            if score > best_score:
+                best_pair = (src_word, tgt_word)
+                best_score = score
+
+        return best_pair
+
+    def one_to_one_replace(self, src: str, tgt: str) -> Tuple[bool, Replacement]:
+        return self.one_to_many_replace(src, [tgt])
+
+    def one_to_many_replace(self, src: str, tgt: List[str]) -> Tuple[bool, Tuple[str, str]]:
         candidates = []
-        most_sim_words = self.src_embedding.most_similar_word(src[f_index])
+        most_sim_words = self.src_embedding.most_similar_word(src)
 
-        if src[f_index] in self.src_voc:
-            most_sim_words.insert(0, (src[f_index], 1.0))
-
-        logger.debug("most similar words of %s in the src vocab are %s" % (src[f_index], str(most_sim_words)))
-        if most_sim_words[0][1] < self.src_sim_threshold:
+        logger.debug("most similar words of %s in the src vocab are %s" % (src[0], str(most_sim_words)))
+        if most_sim_words[0].similarity < self.src_sim_threshold:
             logger.debug("Similarity(%f) to most similar word is less than %f, so not replacing." % (most_sim_words[0][1], self.src_sim_threshold,))
             return False, None
 
         for most_sim_word, cos_sim in most_sim_words:
-            assert most_sim_word == src[f_index] \
-                   or most_sim_word in self.src_dic, "%s is not in the dictionary!" % most_sim_word
+            assert most_sim_word == src or most_sim_word in self.src_dic, "%s is not in the dictionary!" % most_sim_word
             translations = self.lexf2e.get_translations(
                 most_sim_word, only_in_vocab=True,
                 prob_threshold=self.lex_prob_threshold
             )
-            if len(translations) > 0:
-                candidates += list(
-                    zip_longest([(most_sim_word, cos_sim)], translations, fillvalue=(most_sim_word, cos_sim))
-                )
+            for target_word, prob in translations:
+                candidates.append(Candidate(most_sim_word, target_word, cos_sim, prob))
 
         if len(candidates) > 0:
-            best_fword, best_eword = self.get_best_src_tgt_pair(src, tgt, f_index, e_index, candidates)
-            new_fword = best_fword
-            new_eword = best_eword
-            if self.tgt_emb.similarity(tgt[e_index], new_eword) < self.tgt_sim_threshold:
+            best_src_word, best_tgt_word = self.get_best_candidate([src], tgt, candidates)
+            if len(tgt) == 1 and self.tgt_emb.similarity(tgt[0], best_tgt_word) < self.tgt_sim_threshold:
                 logger.debug(
                     "No replacement because cos(e(%s), e'(%s)) < %f" % (
-                        tgt[e_index],
-                        new_eword,
+                        tgt[0],
+                        best_tgt_word,
                         self.tgt_sim_threshold
                     )
                 )
                 return False, None
             else:
-                pass
+                return True, (best_src_word, best_tgt_word)
+
+        return False, None
+
+    def many_to_one_replace(self, src: List[str], tgt: str) -> Tuple[bool, Tuple[str, str]]:
+        candidates = []
+        most_sim_words = self.tgt_embedding.most_similar_word(tgt)
+
+        logger.debug("most similar words of %s in the tgt vocab are %s" % (tgt, str(most_sim_words)))
+        if most_sim_words[0].similarity < self.tgt_sim_threshold:
+            logger.debug("Similarity(%f) to most similar word is less than %f, so not replacing." % (most_sim_words[0][1], self.src_tgt_threshold,))
+            return False, None
+
+        for most_sim_word, cos_sim in most_sim_words:
+            assert most_sim_word == src or most_sim_word in self.tgt_dic, "%s is not in the dictionary!" % most_sim_word
+            translations = self.lexe2f.get_translations(
+                most_sim_word, only_in_vocab=True,
+                prob_threshold=self.lex_prob_threshold
+            )
+            for target_word, prob in translations:
+                candidates.append(Candidate(most_sim_word, target_word, cos_sim, prob))
+
+        if len(candidates) > 0:
+            best_src_word, best_tgt_word = self.get_best_candidate(src, [tgt], candidates)
+            if len(src) == 1 and self.src_emb.similarity(src[0], best_src_word) < self.src_sim_threshold:
+                logger.debug(
+                    "No replacement because cos(e(%s), e'(%s)) < %f" % (
+                        src[0],
+                        best_src_word,
+                        self.src_sim_threshold
+                    )
+                )
+                return False, None
+            else:
+                return True, (best_src_word, best_tgt_word)
 
         return False, None
 
