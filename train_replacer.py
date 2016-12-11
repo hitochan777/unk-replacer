@@ -141,23 +141,20 @@ class Replacer:
                 if success:
                     continue
 
-            if len(f_indices) > 1 and len(e_indices) > 1:  # many-to-many
-                if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):
-                    new_src = self.apply_bpe_source(src[f_indices[0]:f_indices[-1]+1])
-                    new_tgt = self.apply_bpe_target(tgt[e_indices[0]:e_indices[-1]+1])
-                    new_src_seq[f_indices[0]:f_indices[-1]+1] = [None] * len(f_indices)
-                    new_src_seq[f_indices[0]] = new_src
-                    new_tgt_seq[e_indices[0]:e_indices[-1]+1] = [None] * len(e_indices)
-                    new_tgt_seq[e_indices[0]] = new_tgt
-                    # TODO: save in memory
-                else:
-                    pass
-            else:  # garbage collector
-                if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):
-                    # TODO: save in memory
-                    pass
-                else:
-                    pass
+            for index in f_indices:
+                new_src = self.apply_bpe_source(index)
+                new_src_seq[index] = new_src
+
+            for index in e_indices:
+                new_tgt = self.apply_bpe_target(index)
+                new_tgt_seq[index] = new_tgt
+
+            if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):  # save in memory
+                orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
+                orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
+                new_src_string = " ".join(new_src_seq[f_indices[0]:f_indices[-1]+1])
+                new_tgt_string = " ".join(new_tgt_seq[e_indices[0]:e_indices[-1]+1])
+                self.memory[Replacement(orig_src_string, orig_tgt_string, new_src_string, new_tgt_string)] += 1
 
         new_src_seq = list(filter(None, new_src_seq))
         new_tgt_seq = list(filter(None, new_tgt_seq))
