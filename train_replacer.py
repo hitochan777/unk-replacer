@@ -116,7 +116,7 @@ class Replacer:
                 f_index = f_indices[0]
                 new_src = self.apply_bpe_source(src[f_index])  # type: str
                 new_src_seq[f_index] = new_src
-                self.memory[Replacement(src[0], "<null>", new_src, "<null>")] += 1
+                self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
                 continue
 
             if len(f_indices) == 1 and len(e_indices) == 1:  # one-to-one alignment

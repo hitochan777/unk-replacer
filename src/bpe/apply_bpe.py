@@ -22,7 +22,7 @@ class BPE(object):
         self.bpe_subwords = []
         with open(codes.name) as codes:
             for item in codes:
-                item = item.strip().split(" ")
+                item = item.strip(" \t\n").split(" ")
                 if len(item) == 2:
                     self.bpe_codes.append(tuple(item))
 
@@ -45,7 +45,7 @@ class BPE(object):
     def segment(self, sentence):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
 
-        output = [self.segment_word(word) for word in sentence.strip().split(" ")]
+        output = [self.segment_word(word) for word in sentence.strip(" \t\n").split(" ")]
         return ' '.join(output)
 
     def segment_word(self, word):
@@ -164,5 +164,5 @@ if __name__ == '__main__':
     bpe = BPE(args.codes, args.separator, use_separator=args.use_separator, unk_symbol=args.unk_symbol, eow=args.eow)
 
     for line in args.input:
-        args.output.write(bpe.segment(line).strip())
+        args.output.write(bpe.segment(line).strip(" \t\n"))
         args.output.write('\n')
