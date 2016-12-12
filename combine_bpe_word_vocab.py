@@ -38,7 +38,7 @@ def main(args=None):
         word_voc = json.load(f)
 
     with open(options.output, 'w') as f:
-        final_vocab = [[bpe_src_voc + word_voc[0]], [bpe_tgt_voc + word_voc[1]]]
+        final_vocab = [bpe_src_voc + word_voc[0], bpe_tgt_voc + word_voc[1]]
         json.dump(final_vocab, f)
 
 if __name__ == "__main__":
