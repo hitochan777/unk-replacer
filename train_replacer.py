@@ -25,7 +25,7 @@ class Replacer:
                  lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary,
                  src_voc: Iterable[str], tgt_voc: Iterable[str],
                  src_bpe: BPE, tgt_bpe: BPE,
-                 lex_prob_threshold: float=0.3, src_sim_threshold: float=0.5, tgt_sim_threshold: float=0.5) -> None:
+                 lex_prob_threshold: float=0.3, src_sim_threshold: float=0.5, tgt_sim_threshold: float=0.5, allow_unk_character: bool=True) -> None:
 
         self.src_emb = src_emb
         self.tgt_emb = tgt_emb
@@ -42,6 +42,11 @@ class Replacer:
         self.memory = defaultdict(int)
         self.src_bpe = src_bpe  # type: BPE
         self.tgt_bpe = tgt_bpe  # type: BPE
+
+        self.allow_unk_character = allow_unk_character
+
+    def set_allow_unk_character(self, allow_unk_character):
+        self.allow_unk_character = allow_unk_character
 
     def export_memory(self, output: str) -> None:
         if path.isfile(output):
@@ -421,10 +426,12 @@ def main(args=None):
 
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")
+        replacer.set_allow_unk_character(False)
         replacer.replace_parallel_corpus(options.train_src, options.train_tgt, options.train_align, options.replaced_suffix, print_per_lines=10000)
 
     if options.dev_src is not None and options.dev_tgt is not None and options.dev_align is not None:
         logger.info("Processing dev data")
+        replacer.set_allow_unk_character(True)
         replacer.replace_parallel_corpus(options.dev_src, options.dev_tgt, options.dev_align, options.replaced_suffix, print_per_lines=100)
 
     logger.info("Finally writing replacement memory")
