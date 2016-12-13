@@ -113,6 +113,7 @@ class Replacer:
                 assert len(e_indices) == 1
                 e_index = e_indices[0]
                 new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
+                assert self.allow_unk_character or "<unk>" not in new_tgt
                 new_tgt_seq[e_index] = new_tgt
                 continue
 
@@ -120,8 +121,10 @@ class Replacer:
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
                 new_src = self.apply_bpe_source(src[f_index])  # type: str
+                assert self.allow_unk_character or "<unk>" not in new_src
                 new_src_seq[f_index] = new_src
-                self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
+                if "<unk>" not in new_src:
+                    self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
                 continue
 
             if len(f_indices) == 1 and len(e_indices) == 1:  # one-to-one alignment
