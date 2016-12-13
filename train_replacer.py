@@ -4,6 +4,7 @@ from collections import namedtuple
 from itertools import zip_longest
 from itertools import groupby
 import logging
+import sys
 
 from os import path
 import json
@@ -113,7 +114,7 @@ class Replacer:
                 assert len(e_indices) == 1
                 e_index = e_indices[0]
                 new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_tgt
+                assert self.allow_unk_character or "<unk>" not in new_tgt, new_tgt
                 new_tgt_seq[e_index] = new_tgt
                 continue
 
@@ -121,7 +122,7 @@ class Replacer:
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
                 new_src = self.apply_bpe_source(src[f_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_src
+                assert self.allow_unk_character or "<unk>" not in new_src, new_src
                 new_src_seq[f_index] = new_src
                 if "<unk>" not in new_src:
                     self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
@@ -315,7 +316,13 @@ class Replacer:
             src_tokens = src_line.strip().split(' ')
             tgt_tokens = tgt_line.strip().split(' ')
             align = Alignment.convert_string_to_alignment_dictionary(align_line)
-            new_src_tokens, new_tgt_tokens = self.replace(src_tokens, tgt_tokens, align)
+            try:
+                new_src_tokens, new_tgt_tokens = self.replace(src_tokens, tgt_tokens, align)
+            except Exception as e:
+                print("Failed at line %d." % (index + 1,), file=sys.stderr)
+                print(e)
+                sys.exit()
+
             print(" ".join(new_src_tokens), file=new_src_file)
             print(" ".join(new_tgt_tokens), file=new_tgt_file)
             if (index + 1) % print_per_lines == 0:
