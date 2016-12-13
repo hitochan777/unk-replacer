@@ -162,10 +162,12 @@ class Replacer:
 
             for index in f_indices:
                 new_src = self.apply_bpe_source(src[index])
+                assert self.allow_unk_character or "<unk>" not in new_src, new_src
                 new_src_seq[index] = new_src
 
             for index in e_indices:
                 new_tgt = self.apply_bpe_target(tgt[index])
+                assert self.allow_unk_character or "<unk>" not in new_tgt, new_tgt
                 new_tgt_seq[index] = new_tgt
 
             if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):  # save in memory
