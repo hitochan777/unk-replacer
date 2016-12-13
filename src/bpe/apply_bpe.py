@@ -11,7 +11,10 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 
 import sys
 import argparse
+import logging
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 class BPE(object):
@@ -19,14 +22,15 @@ class BPE(object):
     def __init__(self, codes, separator='@@', use_separator=False, unk_symbol="<unk>", eow="</w>"):
         
         self.bpe_codes = []
-        self.bpe_subwords = []
+        self.bpe_subwords = set()
         with open(codes.name) as codes:
+            logger.info("Loading BPE codes from %s" % (codes.name))
             for item in codes:
                 item = item.strip(" \t\n").split(" ")
                 if len(item) == 2:
                     self.bpe_codes.append(tuple(item))
 
-                self.bpe_subwords.append(''.join(item))
+                self.bpe_subwords.add(''.join(item))
 
         # some hacking to deal with duplicates (only consider first instance)
         self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
@@ -35,12 +39,17 @@ class BPE(object):
         self.use_separator = use_separator
         self.unk_symbol = unk_symbol
         self.eow = eow
+        self.cache = {}
 
     def _process_unk(self, word):
         if word in self.bpe_subwords:
             return word
         else:
+            logger.info("%s is unknown" % word)
             return self.unk_symbol
+
+    def get_vocab(self):
+        return self.bpe_subwords
 
     def segment(self, sentence):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
@@ -51,7 +60,7 @@ class BPE(object):
     def segment_word(self, word):
         """segment single word(whitespace-tokenized string) with BPE encoding"""
         output = []
-        new_word = encode(word, self.bpe_codes)
+        new_word = encode(word, self.bpe_codes, self.cache)
         if self.use_separator:
             for item in new_word[:-1]:
                 output.append(self._process_unk(item) + self.separator)
@@ -114,10 +123,9 @@ def get_pairs(word):
     return pairs
 
 
-def encode(orig, bpe_codes, cache={}):
+def encode(orig, bpe_codes, cache):
     """Encode word based on list of BPE merge operations, which are applied consecutively
     """
-
     if orig in cache:
         return cache[orig]
 

@@ -114,7 +114,7 @@ class Replacer:
                 assert len(e_indices) == 1
                 e_index = e_indices[0]
                 new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_tgt, new_tgt
+                assert self.allow_unk_character or "<unk>" not in new_tgt, "In null-to-one: new target sequence %s contains <unk>" % new_tgt
                 new_tgt_seq[e_index] = new_tgt
                 continue
 
@@ -122,7 +122,7 @@ class Replacer:
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
                 new_src = self.apply_bpe_source(src[f_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_src, new_src
+                assert self.allow_unk_character or "<unk>" not in new_src, "In one-to-null: New source sequence %s contains <unk>" % new_src
                 new_src_seq[f_index] = new_src
                 if "<unk>" not in new_src:
                     self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
@@ -162,12 +162,12 @@ class Replacer:
 
             for index in f_indices:
                 new_src = self.apply_bpe_source(src[index])
-                assert self.allow_unk_character or "<unk>" not in new_src, new_src
+                assert self.allow_unk_character or "<unk>" not in new_src, "New source sequence %s contains <unk>" % new_src
                 new_src_seq[index] = new_src
 
             for index in e_indices:
                 new_tgt = self.apply_bpe_target(tgt[index])
-                assert self.allow_unk_character or "<unk>" not in new_tgt, new_tgt
+                assert self.allow_unk_character or "<unk>" not in new_tgt, "New target sequence %s contains <unk>" % new_tgt
                 new_tgt_seq[index] = new_tgt
 
             if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):  # save in memory
@@ -383,6 +383,7 @@ class Replacer:
             logger.info("Loading source BPE codes from %s" % src_bpe_code_path)
             with open(src_bpe_code_path, 'r') as f:
                 src_bpe = BPE(f, use_separator=True)
+                logger.info("Vocab size of source BPE: %d", len(src_bpe.get_vocab()))
         else:
             src_bpe = None
 
@@ -390,6 +391,7 @@ class Replacer:
             logger.info("Loading target BPE codes from %s" % tgt_bpe_code_path)
             with open(tgt_bpe_code_path, 'r') as f:
                 tgt_bpe = BPE(f, use_separator=True)
+                logger.info("Vocab size of target BPE: %d", len(tgt_bpe.get_vocab()))
         else:
             tgt_bpe = None
         
