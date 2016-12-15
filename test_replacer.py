@@ -11,8 +11,9 @@ from src.word2vec import Word2Vec
 class Trie:
     def __init__(self):
         self.__final = False
-        self.__children = defaultdict(lambda: self.__class__())
+        self.__children = defaultdict(lambda: Trie())
         self.__values = defaultdict(int)
+        self.value = None
 
     def add(self, seq: List[Any], word: Any, value=1) -> None:
         current = self
@@ -31,17 +32,16 @@ class Trie:
 
     def __prune(self, node: 'Trie'):
         if node.__final:
-            max_val = max(list(node.__values()))
-            is_one_kept = False
-            for key, value in node.__values:
-                if is_one_kept or value < max_val:
-                    del node.__values[key]
-                else:
-                    is_one_kept
+            max_val = 0
+            max_key = None
+            for key, value in node.__values.items():
+                if value > max_val:
+                    max_val = value
+                    max_key = key
 
-            assert len(node.__values) == 1
+            node.value = max_key
 
-        for _, child in self.__children.items():
+        for key, child in node.__children.items():
             self.__prune(child)
 
     def get_longest_match(self, seq: List[str]) -> Tuple[str, int]:
@@ -56,9 +56,8 @@ class Trie:
             index += 1
 
         if current.__final:
-            replace = list(current.__values.values())
-            assert len(replace) == 0
-            return replace[0], index
+            assert current.value is not None
+            return current.value, index
 
         return None, None
 
