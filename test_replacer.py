@@ -87,17 +87,18 @@ class Replacer:
 
         step = 0
         orig_seq = ["nc"] * len(seq)  # nc means not changed
-        change_seq = ["nc"] * len(seq)
+        change_seq = [["nc"]] * len(seq)
 
         for action in actions:
             start_index, end_index = action[0]
             orig_seq[start_index:end_index] = ["#%d" % step] * (end_index - start_index)
             change_seq[start_index:end_index] = [None] * (end_index - start_index)
             change_seq[start_index] = ["#%d" % step] * len(action[1].split(' '))
-            new_seq[start_index: end_index] = [None] * (end_index - start_index)
+            new_seq[start_index:end_index] = [None] * (end_index - start_index)
             new_seq[start_index] = action[1]
             step += 1
         else:
+            # print(change_seq)
             change_seq = list(filter(None, change_seq))
             change_seq = [item for sublist in change_seq for item in sublist]
 
@@ -115,6 +116,7 @@ class Replacer:
 
             replace_log.append((orig_indices, change_indices))
 
+        logger.debug(replace_log)
         return ' '.join(filter(None, new_seq)), replace_log
 
     def replace_file(self, input_file, suffix, replace_log):
