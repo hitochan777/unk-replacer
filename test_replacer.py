@@ -53,7 +53,7 @@ class Replacer:
 
         # memory lookup
         if self.memory is not None:
-            actions.extend(self.replace_by_memory_lookup(seq))
+            actions.extend(self.get_replace_by_memory_lookup(seq))
 
         for index, word in enumerate(seq):
             skip = False
@@ -86,19 +86,20 @@ class Replacer:
                     )
 
         step = 0
+        orig_seq = ["nc"] * len(seq)  # nc means not changed
+        change_seq = ["nc"] * len(seq)
+
         for action in actions:
             start_index, end_index = action[0]
-            orig_seq = ["nc"] * len(seq)  # nc means not changed
-            change_seq = ["nc"] * len(seq)
             orig_seq[start_index:end_index] = ["#%d" % step] * (end_index - start_index)
             change_seq[start_index:end_index] = [None] * (end_index - start_index)
             change_seq[start_index] = ["#%d" % step] * len(action[1].split(' '))
             new_seq[start_index: end_index] = [None] * (end_index - start_index)
             new_seq[start_index] = action[1]
             step += 1
-
-        change_seq = list(filter(None, change_seq))
-        change_seq = [item for sublist in change_seq for item in sublist]
+        else:
+            change_seq = list(filter(None, change_seq))
+            change_seq = [item for sublist in change_seq for item in sublist]
 
         replace_log = []
         for step_num in range(step):
@@ -112,7 +113,7 @@ class Replacer:
                 if change == "#%d" % step_num:
                     change_indices.append(index)
 
-            replace_log.append(([orig_indices], [change_indices]))
+            replace_log.append((orig_indices, change_indices))
 
         return ' '.join(filter(None, new_seq)), replace_log
 
