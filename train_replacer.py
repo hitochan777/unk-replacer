@@ -348,7 +348,6 @@ class Replacer:
             src_voc = vocab[0]
             tgt_voc = vocab[1]
 
-        
         logger.info("Loading e2f lexical dictionary from %s" % lex_e2f_path)
         lex_e2f = LexicalDictionary.read_lex_table(lex_e2f_path, topn=lex_topn)
         logger.info("Loading f2e lexical dictionary from %s" % lex_f2e_path)

@@ -2,68 +2,14 @@ from typing import Iterable, List, Tuple, Any
 import argparse
 import json
 from os import path
-from collections import defaultdict
 import logging
 
 from src.bpe.apply_bpe import BPE
 from src.word2vec import Word2Vec
+from src.collections import Trie
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class Trie:
-    def __init__(self):
-        self.__final = False
-        self.__children = defaultdict(lambda: Trie())
-        self.__values = defaultdict(int)
-        self.value = None
-
-    def add(self, seq: List[Any], word: Any, value=1) -> None:
-        current = self
-        for unit in seq:
-            current = current.__children[unit]
-
-        current.__final = True
-        current.__values[word] += value
-
-    def prune(self):
-        # Wrapper function for __prune(self, node)
-        # Prune entries in each node that do not have the maximum frequency.
-        # When there are multiple entries with the maximum frequency,
-        # Only one entry is chosen randomly
-        self.__prune(self)
-
-    def __prune(self, node: 'Trie'):
-        if node.__final:
-            max_val = 0
-            max_key = None
-            for key, value in node.__values.items():
-                if value > max_val:
-                    max_val = value
-                    max_key = key
-
-            node.value = max_key
-
-        for key, child in node.__children.items():
-            self.__prune(child)
-
-    def get_longest_match(self, seq: List[str]) -> Tuple[str, int]:
-        current = self
-        index = 0
-        for unit in seq:
-            if unit in current.__children:
-                current = current.__children[unit]
-            else:
-                break
-
-            index += 1
-
-        if current.__final:
-            assert current.value is not None
-            return current.value, index
-
-        return None, None
 
 
 class Replacer:
@@ -78,56 +24,117 @@ class Replacer:
         assert isinstance(self.voc, Iterable[str]), type(self.voc)
         self.memory = memory  # type: Trie
 
-    def replace_by_memory_lookup(self, seq: List[str]) -> List[str]:
+    def get_replace_by_memory_lookup(self, seq: List[str]):
         new_seq = []
         start_idx = 0
+        replacements = []
         while start_idx < len(seq):
             replaced_str, index = self.memory.get_longest_match(seq[start_idx:])
             if replaced_str is not None:
                 assert index is not None
                 print("%s is replaced by %s" % (" ".join(seq[start_idx:start_idx+index]), replaced_str))
-                new_seq.append(replaced_str)
+                replacements.append(
+                    (
+                        (start_idx, start_idx + index),
+                        replaced_str
+                    )
+                )
                 start_idx += index
             else:
                 new_seq.append(seq[start_idx])
                 start_idx += 1
 
-        return ' '.join(new_seq).split(' ')
+        return replacements
 
-    def replace(self, seq: List[str]) -> str:
+    def replace(self, seq: List[str]) -> Tuple[str, Any]:
+        new_seq = list(seq)  # clone seq
+        actions = []
         assert self.emb is not None
 
         # memory lookup
         if self.memory is not None:
-            seq = self.replace_by_memory_lookup(seq)
+            actions.extend(self.get_replace_by_memory_lookup(seq))
 
-        new_seq = [] 
         for index, word in enumerate(seq):
-            if word.endswith(("@@", "</w>")):
+            skip = False
+            for action in actions:
+                assert len(action) == 2
+                start_index, end_index = action[0]
+                if start_index <= index < end_index:
+                    skip = True
+                    break
+
+            if skip:
                 continue
-            
+
             if word not in self.voc:
                 most_similar_words = self.emb.most_similar_word(word)
                 if len(most_similar_words) == 0 or most_similar_words[0].similarity < self.sim_threshold:
                     new_seg = self.bpe.segment_word(word)
-                    new_seq.append(new_seg)
+                    actions.append(
+                        (
+                            (index, index + 1),
+                            new_seg
+                        )
+                    )
                 else:
-                    new_seq.append(most_similar_words[0].word)
-            else:
-                new_seq.append(word)
+                    actions.append(
+                        (
+                            (index, index + 1),
+                            most_similar_words[0].word
+                        )
+                    )
 
-        return " ".join(new_seq)
+        step = 0
+        orig_seq = ["nc"] * len(seq)  # nc means not changed
+        change_seq = [["nc"]] * len(seq)
 
-    def replace_file(self, input_file, suffix):
+        for action in actions:
+            start_index, end_index = action[0]
+            orig_seq[start_index:end_index] = ["#%d" % step] * (end_index - start_index)
+            change_seq[start_index:end_index] = [None] * (end_index - start_index)
+            change_seq[start_index] = ["#%d" % step] * len(action[1].split(' '))
+            new_seq[start_index:end_index] = [None] * (end_index - start_index)
+            new_seq[start_index] = action[1]
+            step += 1
+        else:
+            # print(change_seq)
+            change_seq = list(filter(None, change_seq))
+            change_seq = [item for sublist in change_seq for item in sublist]
+
+        replace_log = []
+        for step_num in range(step):
+            orig_indices = []
+            change_indices = []
+            for index, orig in enumerate(orig_seq):
+                if orig == "#%d" % step_num:
+                    orig_indices.append(index)
+
+            for index, change in enumerate(change_seq):
+                if change == "#%d" % step_num:
+                    change_indices.append(index)
+
+            replace_log.append((orig_indices, change_indices))
+
+        logger.debug(replace_log)
+        return ' '.join(filter(None, new_seq)), replace_log
+
+    def replace_file(self, input_file, suffix, replace_log):
         output_file = input_file + suffix
+        logs = []
         if path.isfile(output_file):
             input("%s will be overwritten. Press Enter to continue" % output_file)
 
         with open(input_file, 'r') as lines, open(output_file, 'w') as out:
             for index, line in enumerate(lines):
                 print("Processing line %d" % (index + 1))
-                new_line = self.replace(line.strip().split(' '))
+                new_line, log = self.replace(line.strip().split(' '))
+                logs.append(log)
                 print(new_line, file=out)
+
+        with open(replace_log, 'w') as log_fs:
+            logger.info("Writing replacement logs to %s" % replace_log)
+            json.dump(logs, log_fs)
 
     @classmethod
     def build_memory(cls, memory_list: List):
@@ -192,6 +199,8 @@ def main(args=None):
                         help='Threshold value for source cosine similarity')
     parser.add_argument('--emb-vocab-size', metavar='K',
                         type=int, default=10000, help='Use top %(metavar)s most frequent in-vocab words as replacement')
+    parser.add_argument('--replace-log', type=str, required=True,
+                        help='Path to log file that keeps track of which parts of input sentences were replaced.')
 
     options = parser.parse_args(args)
 
@@ -204,7 +213,7 @@ def main(args=None):
                                 sim_threshold=options.sim_threshold,
                                 memory=options.memory)
 
-    replacer.replace_file(options.input, options.replaced_suffix)
+    replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
 if __name__ == "__main__":
     main()
