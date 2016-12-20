@@ -152,7 +152,7 @@ class Restorer:
                     candidates_replaced_src = list(self.memory[replaced_src[fIndex]].values())
                     candidates_replaced_src = list(zip(candidates_replaced_src, [1.0]* len(candidates_replaced_src)))
                 else:
-                    logger.info(replaced_src[fIndex])
+                    logger.info("%s not in the replacement memory." % replaced_src[fIndex])
                     candidates_replaced_src = []
 
             for word, prob in candidates_replaced_src:
