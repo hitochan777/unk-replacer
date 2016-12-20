@@ -13,12 +13,17 @@ logger = logging.getLogger(__name__)
 
 class Restorer:
     def __init__(self, lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary, memory=None,
-                 prob_threshold=0.1, attention_threshold=0.1):
+                 prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False):
         self.lex_e2f = lex_e2f
         self.lex_f2e = lex_f2e
         self.memory = memory
         self.prob_threshold = prob_threshold
         self.attention_threshold = attention_threshold
+
+        if lex_backoff:
+            logger.info("Lexical table backoff is True")
+
+        self.lex_backoff = lex_backoff
 
         self.count_back_substitute = 0
         self.count_changed_src = 0
@@ -129,8 +134,7 @@ class Restorer:
                         else:
                             best_word = None
 
-                    if best_word is None:
-                        assert len(fIndices_before) == 1
+                    if best_word is None and len(fIndices_before) == 1:
                         candidates = self.lex_f2e.get_translations(cond=orig_src[fIndices_before[0]], only_in_vocab=False, topn=1)
                         if len(candidates) == 0:
                             best_word = orig_src[fIndices_before[0]]  # copy source word because there is no translation
@@ -148,9 +152,12 @@ class Restorer:
                 candidates_replaced_src = self.lex_f2e.get_translations(cond=replaced_src[fIndex], only_in_vocab=False,
                                                                        prob_threshold=self.prob_threshold)
             else:
-                if replaced_src[fIndex] in self.memory:  
+                if replaced_src[fIndex] in self.memory:
                     candidates_replaced_src = list(self.memory[replaced_src[fIndex]].values())
                     candidates_replaced_src = list(zip(candidates_replaced_src, [1.0]* len(candidates_replaced_src)))
+                elif self.lex_backoff:
+                    candidates_replaced_src = self.lex_f2e.get_translations(cond=replaced_src[fIndex], only_in_vocab=False,
+                                                                       prob_threshold=self.prob_threshold)
                 else:
                     logger.info("%s not in the replacement memory." % replaced_src[fIndex])
                     candidates_replaced_src = []
@@ -170,15 +177,37 @@ class Restorer:
                         logger.warning("There were no non-recovered target indices for %s! Using next candidate..." % (word,))
                         continue
 
-                    candidates_orig_src = self.lex_f2e.get_translations(cond=orig_src[fIndex], only_in_vocab=False, topn=1)
+                    orig_src_seq = " ".join(orig_src[fIndices_before[0]:fIndices_before[-1] + 1])
+                    candidates_orig_src = None
+                    if self.memory is None:
+                        assert len(fIndices_before) == 1
+                        candidates_orig_src = self.lex_f2e.get_translations(cond=orig_src[fIndices_before[0]], only_in_vocab=False, topn=1)
+                    else:
+                        if replaced_src[fIndex] in self.memory and translation[eIndex] in self.memory[replaced_src[fIndex]]:
+                            dic = self.memory[replaced_src[fIndex]][translation[e_index_with_max_score]]
+                            if orig_src_seq in dic:
+                                candidates_orig_src = [dic[orig_src_seq][0]]  # For now use the first one
+                                logger.info("Using memory to translate %s➔%s" % (orig_src_seq), candidates_orig_src[0])
+                                assert type(best_word) == str, best_word
+                                
+                        if candidates_orig_src is None:
+                            if self.lex_backoff and len(fIndices_before) == 1:
+                                candidates_orig_src = self.lex_f2e.get_translations(cond=orig_src[fIndices_before[0]], only_in_vocab=False, topn=1)
+
+                                if len(candidates_orig_src) > 0:
+                                    logger.info("Backoff to lexical translation to translate %s➔%s" % (orig_src_seq, candidates_orig_src[0]))
+                            else:
+                                candidates_orig_src = []
+
                     if len(candidates_orig_src) == 0:
-                        best_word = orig_src[fIndex]
+                        best_word = orig_src_seq
                         self.nb_no_dic_entry += 1
+                        logger.info("[copy] %s ➔ %s" % (translation[best_index], best_word))
                     else:
                         best_word = candidates_orig_src[0][0]
+                        logger.info("[dic] %s ➔ %s" % (translation[best_index], best_word))
 
                     recovered_translation[best_index] = best_word
-                    logger.info("[dic] %s ➔ %s" % (translation[best_index], best_word))
                     is_recovered[best_index] = True
                     self.count_back_substitute += 1
                     break
@@ -213,7 +242,7 @@ class Restorer:
 
 
     @classmethod
-    def factory(cls, lex_e2f_path: str, lex_f2e_path: str, memory_path: str=None):
+    def factory(cls, lex_e2f_path: str, lex_f2e_path: str, memory_path: str=None, lex_backoff: bool=False):
         logger.info("Loading e2f lexical dictionary from %s" % lex_e2f_path)
         lex_e2f = LexicalDictionary.read_lex_table(lex_e2f_path, topn=None)
         logger.info("Loading f2e lexical dictionary from %s" % lex_f2e_path)
@@ -228,7 +257,7 @@ class Restorer:
                 for (orig_src, orig_tgt, rep_src, rep_tgt), freq in memory_list:
                     memory[rep_src][rep_tgt][orig_src].append(rep_tgt)
 
-        return cls(lex_e2f, lex_f2e, memory)
+        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff)
 
 
 def main(args=None):
@@ -242,12 +271,15 @@ def main(args=None):
     parser.add_argument('--memory', default=None, type=str, help='Path to replacement memory')
     parser.add_argument('--replace-log', required=True, type=str, help='Path to replacement log')
     parser.add_argument('--attention', required=True, type=str, help='Path to attention')
+    parser.add_argument('-b', '--lex-backoff', action='store_true', 
+                        help='Use lexical table when entry is not found in memory')
 
     options = parser.parse_args(args)
 
     replacer = Restorer.factory(lex_e2f_path=options.lex_e2f,
                                 lex_f2e_path=options.lex_f2e,
-                                memory_path=options.memory)
+                                memory_path=options.memory,
+                                lex_backoff=options.lex_backoff)
 
     replacer.restore_file(options.translation, options.orig_input, options.replaced_input, options.output, options.attention, options.replace_log)
 
