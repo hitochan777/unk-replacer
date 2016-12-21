@@ -1,2 +1,15 @@
-# hybrid-unk-replacer
-[![wercker status](https://app.wercker.com/status/2b4fa751bb1b4b453ddfb6187f524f87/s/ "wercker status")](https://app.wercker.com/project/byKey/2b4fa751bb1b4b453ddfb6187f524f87)
+# Replacer
+
+Unknown word replacer in Neural Machine Translation (NMT)
+
+[![wercker status](https://app.wercker.com/status/f85bf4841c6422cd5ddfba7bdf635318/s/master "wercker status")](https://app.wercker.com/project/byKey/f85bf4841c6422cd5ddfba7bdf635318)
+
+## Requirements
+- Python 3.x
+
+## Install
+
+```
+make install
+make test (Optional)
+```
