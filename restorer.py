@@ -139,11 +139,12 @@ class Restorer:
                         if len(candidates) == 0:
                             best_word = orig_src[fIndices_before[0]]  # copy source word because there is no translation
                             self.nb_no_dic_entry += 1
+                            logger.info("[copy] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                         else:
                             best_word = candidates[0].word
+                            logger.info("[attn] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
 
                     recovered_translation[e_index_with_max_score] = best_word
-                    logger.info("[attn] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                     is_recovered[e_index_with_max_score] = True
                     self.count_back_substitute += 1
                     continue
