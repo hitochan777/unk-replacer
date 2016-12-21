@@ -70,7 +70,9 @@ class Restorer:
         max_prob = 0.0
         for e_word, f2e_prob in candidates:
             e2f_prob = self.lex_e2f.get_prob(cond=e_word, word=f_word)
-            if (e2f_prob + f2e_prob)/2 > max_prob:
+            cur_prob = (e2f_prob + f2e_prob)/2.0
+            if cur_prob > max_prob:
+                max_prob = cur_prob
                 best_e_word = e_word
 
         return best_e_word, True
@@ -109,6 +111,8 @@ class Restorer:
             if is_recovered[e_index_with_max_score]:
                 logger.warning("%d-th word is already recovered so skipping (1)" % e_index_with_max_score)
             else:
+                is_recovered[e_index_with_max_score] = True
+                self.count_back_substitute += 1
                 if self.memory is not None:
                     if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
                         dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
@@ -116,25 +120,21 @@ class Restorer:
                             best_word = dic[orig_src_seq][0]  # choose the first one for now
                             recovered_translation[e_index_with_max_score] = best_word
                             logger.info("[1:memory] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
-                            is_recovered[e_index_with_max_score] = True
                             assert type(best_word) == str, best_word
                             return
 
                 if orig_src_seq_len == 1:
                     best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
-                    recovered_translation[e_index_with_max_score] = best_word
-                    is_recovered[e_index_with_max_score] = True
+                    assert type(best_word) == str, best_word
                     if in_dict:
                         logger.info("[1:attn] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
-                    else:
-                        self.nb_no_dic_entry += 1
-                        logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                        recovered_translation[e_index_with_max_score] = best_word
+                        return
 
-                    return
-
-                recovered_translation[e_index_with_max_score] = best_word
-                is_recovered[e_index_with_max_score] = True
-                self.count_back_substitute += 1
+                self.nb_no_dic_entry += 1
+                logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], orig_src_seq))
+                recovered_translation[e_index_with_max_score] = orig_src_seq
+                assert type(best_word) == str, orig_src_seq
                 return
 
         if self.memory is None:
@@ -180,22 +180,26 @@ class Restorer:
                         logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
                         recovered_translation[best_index] = best_word
                         is_recovered[best_index] = True
+                        self.count_back_substitute += 1
                         return
                 else:
                     if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
                         dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
                         if orig_src_seq in dic:
                             best_word = dic[orig_src_seq][0]  # For now use the first one
+                            assert isinstance(best_word, str), best_word
                             recovered_translation[best_index] = best_word
                             is_recovered[best_index] = True
+                            self.count_back_substitute += 1
                             logger.info("[2:memory] %s ➔ %s" % (translation[best_index], best_word))
                             return
 
                     if self.lex_backoff and orig_src_seq_len == 1:
                         best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
                         if in_dict:
-                            recovered_translation[best_index] = best_index
+                            recovered_translation[best_index] = best_word
                             is_recovered[best_index] = True
+                            self.count_back_substitute += 1
                             logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
                             return
 
@@ -244,7 +248,7 @@ class Restorer:
 
             self.count_changed_src += 1
 
-            orig_src_seq = orig_src[fIndices_before[0]:fIndices_before[-1] + 1]
+            orig_src_seq = ' '.join(orig_src[fIndices_before[0]:fIndices_before[-1] + 1])
             f_index = fIndices_after[0]
             self.process_one_replaced_word(orig_src_seq=orig_src_seq, replaced_src_word=replaced_src[f_index],
                                            attention=attention[f_index], translation=translation,
