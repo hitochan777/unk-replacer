@@ -26,7 +26,8 @@ class Replacer:
                  lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary,
                  src_voc: Iterable[str], tgt_voc: Iterable[str],
                  src_bpe: BPE, tgt_bpe: BPE,
-                 lex_prob_threshold: float=0.3, src_sim_threshold: float=0.5, tgt_sim_threshold: float=0.5, allow_unk_character: bool=True) -> None:
+                 lex_prob_threshold: float=0.3, src_sim_threshold: float=0.5, tgt_sim_threshold: float=0.5,
+                 allow_unk_character: bool=True, backoff: str="unk") -> None:
 
         self.src_emb = src_emb
         self.tgt_emb = tgt_emb
@@ -45,6 +46,9 @@ class Replacer:
         self.tgt_bpe = tgt_bpe  # type: BPE
 
         self.allow_unk_character = allow_unk_character
+
+        logger.info("Using %s as a backoff method" % backoff)
+        self.backoff = backoff
 
     def set_allow_unk_character(self, allow_unk_character):
         self.allow_unk_character = allow_unk_character
@@ -112,21 +116,34 @@ class Replacer:
         for f_indices, e_indices in unk_scc:
             if len(f_indices) == 0:  # null alignment
                 assert len(e_indices) == 1
-                e_index = e_indices[0]
-                new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_tgt, "In null-to-one: new target sequence %s contains <unk>" % new_tgt
-                new_tgt_seq[e_index] = new_tgt
-                continue
+                if self.backoff == "unk":
+                    continue
+                elif self.backoff == "bpe":
+                    e_index = e_indices[0]
+                    new_tgt = self.apply_bpe_target(tgt[e_index])  # type: str
+                    assert self.allow_unk_character or "<unk>" not in new_tgt, "In null-to-one: new target sequence %s contains <unk>" % new_tgt
+                    new_tgt_seq[e_index] = new_tgt
+                    continue
+                else:
+                    raise NotImplementedError()
 
             if len(e_indices) == 0:  # null alignment
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
-                new_src = self.apply_bpe_source(src[f_index])  # type: str
-                assert self.allow_unk_character or "<unk>" not in new_src, "In one-to-null: New source sequence %s contains <unk>" % new_src
-                new_src_seq[f_index] = new_src
-                if "<unk>" not in new_src:
-                    self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
-                continue
+                if self.backoff == "unk":
+                    self.memory[Replacement(src[f_index], "<null>", "<@UNK>", "<null>")] += 1
+                    new_src_seq[f_index] = "<@UNK>"
+                    continue
+                elif self.backoff == "bpe":
+                    new_src = self.apply_bpe_source(src[f_index])  # type: str
+                    assert self.allow_unk_character or "<unk>" not in new_src, "In one-to-null: New source sequence %s contains <unk>" % new_src
+                    new_src_seq[f_index] = new_src
+                    if "<unk>" not in new_src:
+                        self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
+
+                    continue
+                else:
+                    raise NotImplementedError()
 
             if len(f_indices) == 1 and len(e_indices) == 1:  # one-to-one alignment
                 f_index, e_index = f_indices[0], e_indices[0]
@@ -161,14 +178,26 @@ class Replacer:
                     continue
 
             for index in f_indices:
-                new_src = self.apply_bpe_source(src[index])
-                assert self.allow_unk_character or "<unk>" not in new_src, "New source sequence %s contains <unk>" % new_src
-                new_src_seq[index] = new_src
+                if self.backoff == "unk":
+                    if src[index] not in self.src_voc:
+                        new_src_seq[index] = "<@UNK>"
+
+                elif self.backoff == "bpe":
+                    new_src = self.apply_bpe_source(src[index])
+                    assert self.allow_unk_character or "<unk>" not in new_src, "New source sequence %s contains <unk>" % new_src
+                    new_src_seq[index] = new_src
+                else:
+                    raise NotImplementedError()
 
             for index in e_indices:
-                new_tgt = self.apply_bpe_target(tgt[index])
-                assert self.allow_unk_character or "<unk>" not in new_tgt, "New target sequence %s contains <unk>" % new_tgt
-                new_tgt_seq[index] = new_tgt
+                if self.backoff == "unk":
+                    if tgt[index] not in self.tgt_voc:
+                        new_tgt_seq[index] = "<@UNK>"
+
+                elif self.backoff == "bpe":
+                    new_tgt = self.apply_bpe_target(tgt[index])
+                    assert self.allow_unk_character or "<unk>" not in new_tgt, "New target sequence %s contains <unk>" % new_tgt
+                    new_tgt_seq[index] = new_tgt
 
             if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):  # save in memory
                 orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
@@ -176,6 +205,9 @@ class Replacer:
                 new_src_string = " ".join(new_src_seq[f_indices[0]:f_indices[-1]+1])
                 new_tgt_string = " ".join(new_tgt_seq[e_indices[0]:e_indices[-1]+1])
                 self.memory[Replacement(orig_src_string, orig_tgt_string, new_src_string, new_tgt_string)] += 1
+
+            else:
+                raise NotImplementedError()
 
         new_src_seq = list(filter(None, new_src_seq))
         new_tgt_seq = list(filter(None, new_tgt_seq))
@@ -340,7 +372,8 @@ class Replacer:
     @classmethod
     def factory(cls, src_w2v_model_path, tgt_w2v_model_path, src_w2v_model_topn,
                 lex_e2f_path, lex_f2e_path, lex_topn, voc_path, src_w2v_lowercase=False,
-                tgt_w2v_lowercase=False, src_bpe_code_path: str=None, tgt_bpe_code_path: str=None):
+                tgt_w2v_lowercase=False, src_bpe_code_path: str=None, tgt_bpe_code_path: str=None,
+                backoff: str="unk"):
         logger.info("Loading vocabulary from %s" % voc_path)
         with open(voc_path, 'r') as f:
             vocab = json.load(f)
@@ -378,26 +411,25 @@ class Replacer:
         logger.info("Setting vocabulary in target word2vec")
         tgt_emb.set_vocab(filtered_tgt_voc)
 
-        if src_bpe_code_path is not None:
+        if backoff == "bpe":
+            assert src_bpe_code_path is not None
+            assert tgt_bpe_code_path is not None
             logger.info("Loading source BPE codes from %s" % src_bpe_code_path)
             with open(src_bpe_code_path, 'r') as f:
                 src_bpe = BPE(f, use_separator=True)
                 logger.info("Vocab size of source BPE: %d", len(src_bpe.get_vocab()))
-        else:
-            src_bpe = None
 
-        if tgt_bpe_code_path is not None:
             logger.info("Loading target BPE codes from %s" % tgt_bpe_code_path)
             with open(tgt_bpe_code_path, 'r') as f:
                 tgt_bpe = BPE(f, use_separator=True)
                 logger.info("Vocab size of target BPE: %d", len(tgt_bpe.get_vocab()))
-        else:
-            tgt_bpe = None
-        
+        elif backoff == "unk":
+            src_bpe, tgt_bpe = None, None
+
         logger.info("Building Replacer instance")
         return cls(src_emb=src_emb, tgt_emb=tgt_emb, lex_e2f=lex_e2f,
                    lex_f2e=lex_f2e, src_voc=src_voc, tgt_voc=tgt_voc,
-                   src_bpe=src_bpe, tgt_bpe=tgt_bpe)
+                   src_bpe=src_bpe, tgt_bpe=tgt_bpe, backoff=backoff)
 
 
 def main(args=None):
@@ -422,6 +454,8 @@ def main(args=None):
     parser.add_argument('--src-bpe-code', default=None, type=str, help='Path to source BPE code')
     parser.add_argument('--tgt-bpe-code', default=None, type=str, help='Path to target BPE code')
     parser.add_argument('--memory', required=True, type=str, help='Save path to replacement memory')
+    parser.add_argument('--backoff', choices=['bpe', 'unk'], default='unk', metavar='BACKOFF',
+                        help='Use %(metavar)s for null aligned unknown words or unknown words in many-to-many links')
     # TODO: add src-sim, tgt-sim, prob, threshold
     # TODO: add embedding vocab option
 
@@ -435,7 +469,8 @@ def main(args=None):
                                 lex_topn=options.lex_topn,
                                 voc_path=options.vocab,
                                 src_bpe_code_path=options.src_bpe_code,
-                                tgt_bpe_code_path=options.tgt_bpe_code)
+                                tgt_bpe_code_path=options.tgt_bpe_code,
+                                backoff=options.backoff)
 
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")
