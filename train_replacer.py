@@ -149,31 +149,31 @@ class Replacer:
                 f_index, e_index = f_indices[0], e_indices[0]
                 success, (new_src, new_tgt) = self.one_to_one_replace(src[f_index], tgt[e_index])
 
-                new_src_seq[f_index] = new_src
-                new_tgt_seq[e_index] = new_tgt
                 if success:
+                    new_src_seq[f_index] = new_src
+                    new_tgt_seq[e_index] = new_tgt
                     self.memory[Replacement(src[f_index], tgt[e_index], new_src, new_tgt)] += 1
                     continue
 
             if len(f_indices) == 1 and len(e_indices) > 1 and self.is_contiguous(e_indices):  # one-to-many
                 f_index = f_indices[0]
                 success, (new_src, new_tgt) = self.one_to_many_replace(src[f_index], tgt[e_indices[0]:e_indices[-1]+1])
-                new_src_seq[f_index] = new_src
-                new_tgt_seq[e_indices[0]:e_indices[-1]+1] = [None] * len(e_indices)
-                new_tgt_seq[e_indices[0]] = new_tgt
-                orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
                 if success:
+                    new_src_seq[f_index] = new_src
+                    new_tgt_seq[e_indices[0]:e_indices[-1]+1] = [None] * len(e_indices)
+                    new_tgt_seq[e_indices[0]] = new_tgt
+                    orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
                     self.memory[Replacement(src[f_index], orig_tgt_string, new_src, new_tgt)] += 1
                     continue
 
             if len(f_indices) > 1 and len(e_indices) == 1 and self.is_contiguous(f_indices):  # many-to-one
                 e_index = e_indices[0]
                 success, (new_src, new_tgt) = self.many_to_one_replace(src[f_indices[0]:f_indices[-1]+1], tgt[e_index])
-                new_src_seq[f_indices[0]:f_indices[-1]+1] = [None] * len(f_indices)
-                new_src_seq[f_indices[0]] = new_src
-                new_tgt_seq[e_index] = new_tgt
-                orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
                 if success:
+                    new_src_seq[f_indices[0]:f_indices[-1]+1] = [None] * len(f_indices)
+                    new_src_seq[f_indices[0]] = new_src
+                    new_tgt_seq[e_index] = new_tgt
+                    orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
                     self.memory[Replacement(orig_src_string, tgt[e_index], new_src, new_tgt)] += 1
                     continue
 
@@ -198,6 +198,8 @@ class Replacer:
                     new_tgt = self.apply_bpe_target(tgt[index])
                     assert self.allow_unk_character or "<unk>" not in new_tgt, "New target sequence %s contains <unk>" % new_tgt
                     new_tgt_seq[index] = new_tgt
+                else:
+                    raise NotImplementedError()
 
             if self.is_contiguous(f_indices) and self.is_contiguous(e_indices):  # save in memory
                 orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
@@ -206,8 +208,6 @@ class Replacer:
                 new_tgt_string = " ".join(new_tgt_seq[e_indices[0]:e_indices[-1]+1])
                 self.memory[Replacement(orig_src_string, orig_tgt_string, new_src_string, new_tgt_string)] += 1
 
-            else:
-                raise NotImplementedError()
 
         new_src_seq = list(filter(None, new_src_seq))
         new_tgt_seq = list(filter(None, new_tgt_seq))
@@ -354,7 +354,7 @@ class Replacer:
                 new_src_tokens, new_tgt_tokens = self.replace(src_tokens, tgt_tokens, align)
             except Exception as e:
                 print("Failed at line %d." % (index + 1,), file=sys.stderr)
-                print(e)
+                logger.exception(e)
                 sys.exit()
 
             print(" ".join(new_src_tokens), file=new_src_file)
