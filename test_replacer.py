@@ -15,7 +15,7 @@ logger.setLevel(logging.INFO)
 class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
-                 memory: Trie, sim_threshold: float=0.3) -> None:
+                 memory: Trie, sim_threshold: float=0.3, backoff: str="unk") -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
@@ -23,6 +23,9 @@ class Replacer:
         self.voc = voc  # type: Iterable[str]
         assert isinstance(self.voc, Iterable[str]), type(self.voc)
         self.memory = memory  # type: Trie
+
+        logger.info("Using %s as a backoff method" % backoff)
+        self.backoff = backoff
 
     def get_replace_by_memory_lookup(self, seq: List[str]):
         new_seq = []
@@ -70,7 +73,13 @@ class Replacer:
             if word not in self.voc:
                 most_similar_words = self.emb.most_similar_word(word)
                 if len(most_similar_words) == 0 or most_similar_words[0].similarity < self.sim_threshold:
-                    new_seg = self.bpe.segment_word(word)
+                    if self.backoff == "bpe":
+                        new_seg = self.bpe.segment_word(word)
+                    elif self.backoff == "unk":
+                        new_seg = "<@UNK>"
+                    else:
+                        raise NotImplementedError()
+
                     actions.append(
                         (
                             (index, index + 1),
@@ -152,7 +161,8 @@ class Replacer:
     @classmethod
     def factory(cls, w2v_model_path: str, w2v_model_topn: str,
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
-                bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000):
+                bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
+                backoff: str="unk"):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -179,7 +189,7 @@ class Replacer:
             bpe = None
         
         logger.info("Building replacer")
-        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold)
+        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff)
 
 
 def main(args=None):
@@ -201,6 +211,8 @@ def main(args=None):
                         type=int, default=10000, help='Use top %(metavar)s most frequent in-vocab words as replacement')
     parser.add_argument('--replace-log', type=str, required=True,
                         help='Path to log file that keeps track of which parts of input sentences were replaced.')
+    parser.add_argument('--backoff', choices=['bpe', 'unk'], default='unk', metavar='BACKOFF',
+                        help='Use %(metavar)s as a backoff')
 
     options = parser.parse_args(args)
 
@@ -211,7 +223,8 @@ def main(args=None):
                                 bpe_code_path=options.bpe_code,
                                 emb_voc_size=options.emb_vocab_size,
                                 sim_threshold=options.sim_threshold,
-                                memory=options.memory)
+                                memory=options.memory,
+                                backoff=options.backoff)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
