@@ -8,24 +8,27 @@ from src.bpe.apply_bpe import BPE
 from src.word2vec import Word2Vec
 from src.collections import Trie
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
-                 memory: Trie, sim_threshold: float=0.3, backoff: str="unk") -> None:
+                 memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
+                 too_common_threshold=5000) -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
         self.bpe = bpe  # type: BPE
         self.voc = voc  # type: Iterable[str]
-        assert isinstance(self.voc, Iterable[str]), type(self.voc)
+        assert isinstance(self.voc, list), type(self.voc)
         self.memory = memory  # type: Trie
 
         logger.info("Using %s as a backoff method" % backoff)
         self.backoff = backoff
+
+        self.too_common_threshold = too_common_threshold
 
     def get_replace_by_memory_lookup(self, seq: List[str]):
         new_seq = []
@@ -35,13 +38,17 @@ class Replacer:
             replaced_str, index = self.memory.get_longest_match(seq[start_idx:])
             if replaced_str is not None:
                 assert index is not None
-                print("%s is replaced by %s" % (" ".join(seq[start_idx:start_idx+index]), replaced_str))
-                replacements.append(
-                    (
-                        (start_idx, start_idx + index),
-                        replaced_str
+                src_words = seq[start_idx:start_idx+index]
+                all_too_common = all(word in self.voc[:self.too_common_threshold] for word in src_words)
+                if not all_too_common and replaced_str != " ".join(src_words):
+                    logger.info("[memory] %s→ %s" % (" ".join(src_words), replaced_str))
+                    replacements.append(
+                        (
+                            (start_idx, start_idx + index),
+                            replaced_str
+                        )
                     )
-                )
+
                 start_idx += index
             else:
                 new_seq.append(seq[start_idx])
@@ -150,9 +157,6 @@ class Replacer:
         trie = Trie()
         for memory in memory_list:
             assert isinstance(memory[1], int), memory
-            if memory[0][0] == memory[0][2]:
-                continue
-
             trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
 
         trie.prune()
