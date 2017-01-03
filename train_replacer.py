@@ -323,7 +323,7 @@ class Replacer:
 
         return False, (None, None)
 
-    def replace_parallel_corpus(self, src_file: str, tgt_file: str, align_file: str, suffix: str, print_per_lines: int=10000):
+    def replace_parallel_corpus(self, src_file: str, tgt_file: str, align_file: str, suffix: str, print_per_lines: int=10000, first_n_lines: int=None):
         new_src_filename = src_file + suffix
         new_tgt_filename = tgt_file + suffix
         existing_files = []
@@ -343,6 +343,9 @@ class Replacer:
         align_lines = open(align_file, 'r')
 
         for index, (src_line, tgt_line, align_line) in enumerate(zip_longest(src_lines, tgt_lines, align_lines)):
+
+            if first_n_lines is not None and first_n_lines <= index:
+                break
 
             if src_line is None or tgt_line is None or align_line is None:
                 break
@@ -435,7 +438,10 @@ class Replacer:
 def main(args=None):
     parser = argparse.ArgumentParser(description='Replace training data')
     parser.add_argument('--src-w2v-model', required=True, type=str, help='Path to source word2vec model')
+    parser.add_argument('--src-w2v-lowercase', action='store_true', help='Lowercase words before querying src word2vec')
     parser.add_argument('--tgt-w2v-model', required=True, type=str, help='Path to target word2vec model')
+    parser.add_argument('--tgt-w2v-lowercase', action='store_true', help='Lowercase words before querying tgt word2vec')
+    parser.add_argument('--train-first-n-lines', default=None, type=int, help='Process first %(metavar)s lines in training data', metavar='N')
     parser.add_argument('--src-w2v-model-topn', metavar='K', default=10, type=int,
                         help='Use top %(metavar)s most similar words from source word2vec')
     parser.add_argument('--lex-e2f', required=True, type=str, help='Path to target to source lexical dictionary')
@@ -462,7 +468,9 @@ def main(args=None):
     options = parser.parse_args(args)
 
     replacer = Replacer.factory(src_w2v_model_path=options.src_w2v_model,
+                                src_w2v_lowercase=options.src_w2v_lowercase,
                                 tgt_w2v_model_path=options.tgt_w2v_model,
+                                tgt_w2v_lowercase=options.tgt_w2v_lowercase,
                                 src_w2v_model_topn=options.src_w2v_model_topn,
                                 lex_e2f_path=options.lex_e2f,
                                 lex_f2e_path=options.lex_f2e,
@@ -475,7 +483,7 @@ def main(args=None):
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")
         replacer.set_allow_unk_character(False)
-        replacer.replace_parallel_corpus(options.train_src, options.train_tgt, options.train_align, options.replaced_suffix, print_per_lines=10000)
+        replacer.replace_parallel_corpus(options.train_src, options.train_tgt, options.train_align, options.replaced_suffix, print_per_lines=10000, first_n_lines=options.train_first_n_lines)
 
     if options.dev_src is not None and options.dev_tgt is not None and options.dev_align is not None:
         logger.info("Processing dev data")

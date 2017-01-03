@@ -77,7 +77,7 @@ class Word2Vec:
         assert self.model is not None
         self.vocab = vocab
         self.model.init_sims()
-        indices = list(map(lambda word: self.model.vocab[word].index, vocab[:topn]))
+        indices = list(map(lambda word: self.model.vocab[self.lowercase(word)].index, vocab[:topn]))
         self.syn0norm_in_vocab = self.model.syn0norm[indices]
 
     def lowercase(self, word: str) -> str:
