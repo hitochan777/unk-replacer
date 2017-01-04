@@ -3,6 +3,7 @@ import logging
 import json
 from typing import List, Tuple
 from itertools import zip_longest
+import re
 
 from src.lexical_dictionary import LexicalDictionary
 
@@ -78,11 +79,17 @@ class Restorer:
         return best_e_word, True
 
     def process_one_replaced_word(self, orig_src_seq: str, replaced_src_word: str, attention: List[float],
-                                  translation: List[str], is_recovered: List[bool], recovered_translation: List[str]):
+                                  translation: List[str], is_recovered: List[bool], recovered_translation: List[str], f_index: int):
         orig_src_seq_len = len(orig_src_seq.split(' '))
         max_score = float('-inf')  # type: float
         e_index_with_max_score = -1  # type: int
         for eIndex, attention_prob in enumerate(attention):
+            if ("#T_UNK_%d#" % f_index) == translation[eIndex]:
+                max_score = float('inf')  # any number > -inf suffices
+                e_index_with_max_score = eIndex 
+                logger.info("replaced word %s was traslated to UNK symbol" % replaced_src_word)
+                break
+
             if attention_prob < self.attention_threshold:
                 continue
 
@@ -258,10 +265,55 @@ class Restorer:
             self.process_one_replaced_word(orig_src_seq=orig_src_seq, replaced_src_word=replaced_src[f_index],
                                            attention=attention[f_index], translation=translation,
                                            is_recovered=is_recovered,
-                                           recovered_translation=recovered_translation)
+                                           recovered_translation=recovered_translation, f_index=f_index)
 
         recovered_translation = self.restore_bpe(list(filter(None, recovered_translation)))
+        # recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src) ,log)
         return ' '.join(recovered_translation)
+
+    def replace_unk_symbols(self, orig_src: List[str], translation: List[str], replaced_src_len: int, log) -> List[str]:
+        output = list(translation)
+        orig_idx_dic = dict()
+        l1 = list(range(len(orig_src)))
+        l2 = list(range(replaced_src_len))
+
+        for idx_before, idx_after in log:
+            if len(idx_before) == 1 and len(idx_after) == 1:  # temporary cure for the case when log contains <@UNK> replacement
+                continue
+
+            before_min, before_max = idx_before[0], idx_before[-1]
+            assert before_min == min(idx_before)
+            assert before_max == max(idx_before)
+            after_min, after_max = idx_after[0], idx_after[-1]
+            assert after_min == min(idx_after)
+            assert after_max == max(idx_after)
+
+            l1 = l1[:before_min] + l1[before_max + 1:]
+            l2 = l2[:after_min] + l2[after_max + 1:]
+
+        assert len(l1) == len(l2)
+
+        for i in range(len(l1)):
+            orig_idx_dic[l2[i]] = l1[i]
+        
+        for index, word in enumerate(output):
+            m = re.search(r"#T_UNK_(?P<f_index>\d+)#", word)
+            if m is None:
+                continue
+
+            f_index = int(m.group("f_index"))
+            assert f_index in orig_idx_dic, (f_index, orig_idx_dic)
+
+            orig_idx = orig_idx_dic[f_index]
+            orig_word = orig_src[orig_idx]
+            best_word, in_dict = self.get_best_lexical_translation(orig_word)
+            if in_dict:
+                output[index] = best_word
+            else:
+                output[index] = orig_word 
+
+
+        return translation
 
     @staticmethod
     def restore_bpe(seq: List[str]) -> List[str]:
