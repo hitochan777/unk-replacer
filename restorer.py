@@ -114,7 +114,7 @@ class Restorer:
                 is_recovered[e_index_with_max_score] = True
                 self.count_back_substitute += 1
                 if self.memory is not None:
-                    if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
+                    if replaced_src_word in self.memory and translation[e_index_with_max_score] in self.memory[replaced_src_word]:
                         dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
                         if orig_src_seq in dic:
                             best_word = dic[orig_src_seq][0]  # choose the first one for now
@@ -123,18 +123,19 @@ class Restorer:
                             assert type(best_word) == str, best_word
                             return
 
+                    logger.info("%s not found in the memory" % orig_src_seq)
+
                 if orig_src_seq_len == 1:
                     best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
                     assert type(best_word) == str, best_word
                     if in_dict:
-                        logger.info("[1:attn] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                        logger.info("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                         recovered_translation[e_index_with_max_score] = best_word
                         return
 
                 self.nb_no_dic_entry += 1
                 logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], orig_src_seq))
                 recovered_translation[e_index_with_max_score] = orig_src_seq
-                assert type(best_word) == str, orig_src_seq
                 return
 
         if self.memory is None:
@@ -246,10 +247,14 @@ class Restorer:
             if len(fIndices_after) != 1:
                 continue
 
-            self.count_changed_src += 1
-
             orig_src_seq = ' '.join(orig_src[fIndices_before[0]:fIndices_before[-1] + 1])
             f_index = fIndices_after[0]
+            if replaced_src[f_index] == "<@UNK>":
+                logger.info("Skipping <@UNK>")
+                continue
+
+            self.count_changed_src += 1
+
             self.process_one_replaced_word(orig_src_seq=orig_src_seq, replaced_src_word=replaced_src[f_index],
                                            attention=attention[f_index], translation=translation,
                                            is_recovered=is_recovered,
@@ -294,7 +299,7 @@ class Restorer:
                 from collections import defaultdict
                 memory = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
                 for (orig_src, orig_tgt, rep_src, rep_tgt), freq in memory_list:
-                    memory[rep_src][rep_tgt][orig_src].append(rep_tgt)
+                    memory[rep_src][rep_tgt][orig_src].append(orig_tgt)
 
         return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n)
 
