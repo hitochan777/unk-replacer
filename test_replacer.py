@@ -16,7 +16,7 @@ class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
                  memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
-                 too_common_threshold=5000) -> None:
+                 too_common_threshold=5000, mem_with_unk_only=True) -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
@@ -29,6 +29,7 @@ class Replacer:
         self.backoff = backoff
 
         self.too_common_threshold = too_common_threshold
+        self.mem_with_unk_only = mem_with_unk_only
 
     def get_replace_by_memory_lookup(self, seq: List[str]):
         new_seq = []
@@ -40,6 +41,13 @@ class Replacer:
                 assert index is not None
                 src_words = seq[start_idx:start_idx+index]
                 all_too_common = all(word in self.voc[:self.too_common_threshold] for word in src_words)
+
+                if self.mem_with_unk_only:
+                    all_in_vocab = all(word in self.voc for word in src_words)
+                    if all_in_vocab:
+                        start_idx += index
+                        continue
+
                 if not all_too_common and replaced_str != " ".join(src_words):
                     logger.info("[memory] %s→ %s" % (" ".join(src_words), replaced_str))
                     replacements.append(
@@ -166,7 +174,8 @@ class Replacer:
     def factory(cls, w2v_model_path: str, w2v_model_topn: str,
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
                 bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
-                backoff: str="unk", too_common_threshold: int=5000):
+                backoff: str="unk", too_common_threshold: int=5000,
+                use_all_memory: bool=False):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -193,7 +202,7 @@ class Replacer:
             bpe = None
         
         logger.info("Building replacer")
-        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold)
+        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory)
 
 
 def main(args=None):
@@ -217,9 +226,9 @@ def main(args=None):
                         help='Path to log file that keeps track of which parts of input sentences were replaced.')
     parser.add_argument('--backoff', choices=['bpe', 'unk'], default='unk', metavar='BACKOFF',
                         help='Use %(metavar)s as a backoff')
-    parser.add_argument('--too-common-threshold', type=int, default=5000, metavar='BACKOFF', metavar="K",
+    parser.add_argument('--too-common-threshold', type=int, default=5000, metavar="K",
                         help='If all the words in a original source phrase in the memory appear in top %(metavar)s most frequent words in the vocabulary, do not trust the memory and do not replace')
-
+    parser.add_argument('--use-all-memory', action='store_true', help='If not set, replacement memories with at least one unknown words are used')
 
     options = parser.parse_args(args)
 
@@ -232,7 +241,8 @@ def main(args=None):
                                 sim_threshold=options.sim_threshold,
                                 memory=options.memory,
                                 backoff=options.backoff,
-                                too_common_threshold=options.too_common_threshold)
+                                too_common_threshold=options.too_common_threshold,
+                                use_all_memory=options.use_all_memory)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
