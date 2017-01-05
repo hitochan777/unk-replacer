@@ -83,10 +83,10 @@ class Restorer:
         orig_src_seq_len = len(orig_src_seq.split(' '))
         max_score = float('-inf')  # type: float
         e_index_with_max_score = -1  # type: int
-        for eIndex, attention_prob in enumerate(attention):
+        for eIndex, attention_prob in enumerate(attention[:len(translation)]):
             if ("#T_UNK_%d#" % f_index) == translation[eIndex]:
                 max_score = float('inf')  # any number > -inf suffices
-                e_index_with_max_score = eIndex 
+                e_index_with_max_score = eIndex
                 logger.info("replaced word %s was traslated to UNK symbol" % replaced_src_word)
                 break
 
@@ -268,7 +268,7 @@ class Restorer:
                                            recovered_translation=recovered_translation, f_index=f_index)
 
         recovered_translation = self.restore_bpe(list(filter(None, recovered_translation)))
-        # recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src) ,log)
+        recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src) ,log)
         return ' '.join(recovered_translation)
 
     def replace_unk_symbols(self, orig_src: List[str], translation: List[str], replaced_src_len: int, log) -> List[str]:
@@ -278,7 +278,7 @@ class Restorer:
         l2 = list(range(replaced_src_len))
 
         for idx_before, idx_after in log:
-            if len(idx_before) == 1 and len(idx_after) == 1:  # temporary cure for the case when log contains <@UNK> replacement
+            if len(idx_before) == len(idx_after):  # temporary cure for the case when log contains <@UNK> replacement
                 continue
 
             before_min, before_max = idx_before[0], idx_before[-1]
@@ -291,7 +291,7 @@ class Restorer:
             l1 = l1[:before_min] + l1[before_max + 1:]
             l2 = l2[:after_min] + l2[after_max + 1:]
 
-        assert len(l1) == len(l2)
+        assert len(l1) == len(l2), (len(l1), len(l2))
 
         for i in range(len(l1)):
             orig_idx_dic[l2[i]] = l1[i]
@@ -312,8 +312,7 @@ class Restorer:
             else:
                 output[index] = orig_word 
 
-
-        return translation
+        return output
 
     @staticmethod
     def restore_bpe(seq: List[str]) -> List[str]:
