@@ -5,6 +5,7 @@ from itertools import zip_longest
 from itertools import groupby
 import logging
 import sys
+import textwrap
 
 from os import path
 import json
@@ -22,7 +23,7 @@ Replacement = namedtuple('Replacement', 'src_before tgt_before src_after tgt_aft
 
 
 class Replacer:
-    def __init__(self, src_emb: Word2Vec, tgt_emb: Word2Vec,
+    def __init__(self, replace_type: str, store_memory: bool, src_emb: Word2Vec, tgt_emb: Word2Vec,
                  lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary,
                  src_voc: Iterable[str], tgt_voc: Iterable[str],
                  src_bpe: BPE, tgt_bpe: BPE,
@@ -49,6 +50,12 @@ class Replacer:
 
         logger.info("Using %s as a backoff method" % backoff)
         self.backoff = backoff
+
+        logger.info("Replace type is %s" % replace_type)
+        self.replace_type = replace_type
+
+        logger.info("Memorization of replacement is %s" % ("ON" if store_memory else "OFF"))
+        self.store_memory = store_memory
 
     def set_allow_unk_character(self, allow_unk_character):
         self.allow_unk_character = allow_unk_character
@@ -131,7 +138,8 @@ class Replacer:
                 assert len(f_indices) == 1
                 f_index = f_indices[0]
                 if self.backoff == "unk":
-                    self.memory[Replacement(src[f_index], "<null>", "<@UNK>", "<null>")] += 1
+                    if self.store_memory:
+                        self.memory[Replacement(src[f_index], "<null>", "<@UNK>", "<null>")] += 1
                     new_src_seq[f_index] = "<@UNK>"
                     continue
                 elif self.backoff == "bpe":
@@ -139,7 +147,8 @@ class Replacer:
                     assert self.allow_unk_character or "<unk>" not in new_src, "In one-to-null: New source sequence %s contains <unk>" % new_src
                     new_src_seq[f_index] = new_src
                     if "<unk>" not in new_src:
-                        self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
+                        if self.store_memory:
+                            self.memory[Replacement(src[f_index], "<null>", new_src, "<null>")] += 1
 
                     continue
                 else:
@@ -152,10 +161,11 @@ class Replacer:
                 if success:
                     new_src_seq[f_index] = new_src
                     new_tgt_seq[e_index] = new_tgt
-                    self.memory[Replacement(src[f_index], tgt[e_index], new_src, new_tgt)] += 1
+                    if self.store_memory:
+                        self.memory[Replacement(src[f_index], tgt[e_index], new_src, new_tgt)] += 1
                     continue
 
-            if len(f_indices) == 1 and len(e_indices) > 1 and self.is_contiguous(e_indices):  # one-to-many
+            if self.replace_type == "multi" and len(f_indices) == 1 and len(e_indices) > 1 and self.is_contiguous(e_indices):  # one-to-many
                 f_index = f_indices[0]
                 success, (new_src, new_tgt) = self.one_to_many_replace(src[f_index], tgt[e_indices[0]:e_indices[-1]+1])
                 if success:
@@ -163,10 +173,11 @@ class Replacer:
                     new_tgt_seq[e_indices[0]:e_indices[-1]+1] = [None] * len(e_indices)
                     new_tgt_seq[e_indices[0]] = new_tgt
                     orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
-                    self.memory[Replacement(src[f_index], orig_tgt_string, new_src, new_tgt)] += 1
+                    if self.store_memory:
+                        self.memory[Replacement(src[f_index], orig_tgt_string, new_src, new_tgt)] += 1
                     continue
 
-            if len(f_indices) > 1 and len(e_indices) == 1 and self.is_contiguous(f_indices):  # many-to-one
+            if self.replace_type == "multi" and len(f_indices) > 1 and len(e_indices) == 1 and self.is_contiguous(f_indices):  # many-to-one
                 e_index = e_indices[0]
                 success, (new_src, new_tgt) = self.many_to_one_replace(src[f_indices[0]:f_indices[-1]+1], tgt[e_index])
                 if success:
@@ -174,7 +185,9 @@ class Replacer:
                     new_src_seq[f_indices[0]] = new_src
                     new_tgt_seq[e_index] = new_tgt
                     orig_src_string = " ".join(src[f_indices[0]:f_indices[-1]+1])
-                    self.memory[Replacement(orig_src_string, tgt[e_index], new_src, new_tgt)] += 1
+                    if self.store_memory:
+                        self.memory[Replacement(orig_src_string, tgt[e_index], new_src, new_tgt)] += 1
+
                     continue
 
             for index in f_indices:
@@ -206,8 +219,8 @@ class Replacer:
                 orig_tgt_string = " ".join(tgt[e_indices[0]:e_indices[-1]+1])
                 new_src_string = " ".join(new_src_seq[f_indices[0]:f_indices[-1]+1])
                 new_tgt_string = " ".join(new_tgt_seq[e_indices[0]:e_indices[-1]+1])
-                self.memory[Replacement(orig_src_string, orig_tgt_string, new_src_string, new_tgt_string)] += 1
-
+                if self.store_memory:
+                    self.memory[Replacement(orig_src_string, orig_tgt_string, new_src_string, new_tgt_string)] += 1
 
         new_src_seq = list(filter(None, new_src_seq))
         new_tgt_seq = list(filter(None, new_tgt_seq))
@@ -218,7 +231,7 @@ class Replacer:
         candidates must be sorted by cos_sim, and then lex_prob in the descending order
         """
         best_pair = None
-        best_score = 0.0
+        best_score = float('-inf')
         assert not(len(src) > 1 and len(tgt) > 1), "At least one side has only one word"
         for candidate in candidates:
             src_word, tgt_word = candidate.src_word, candidate.tgt_word
@@ -243,6 +256,8 @@ class Replacer:
             if score > best_score:
                 best_pair = (src_word, tgt_word)
                 best_score = score
+
+        assert best_pair is not None
 
         return best_pair
 
@@ -373,7 +388,7 @@ class Replacer:
         new_tgt_file.close()
 
     @classmethod
-    def factory(cls, src_w2v_model_path, tgt_w2v_model_path, src_w2v_model_topn,
+    def factory(cls, replace_type: str, store_memory: bool, src_w2v_model_path, tgt_w2v_model_path, src_w2v_model_topn,
                 lex_e2f_path, lex_f2e_path, lex_topn, voc_path, src_w2v_lowercase=False,
                 tgt_w2v_lowercase=False, src_bpe_code_path: str=None, tgt_bpe_code_path: str=None,
                 backoff: str="unk"):
@@ -432,11 +447,12 @@ class Replacer:
         logger.info("Building Replacer instance")
         return cls(src_emb=src_emb, tgt_emb=tgt_emb, lex_e2f=lex_e2f,
                    lex_f2e=lex_f2e, src_voc=src_voc, tgt_voc=tgt_voc,
-                   src_bpe=src_bpe, tgt_bpe=tgt_bpe, backoff=backoff)
+                   src_bpe=src_bpe, tgt_bpe=tgt_bpe, backoff=backoff,
+                   replace_type=replace_type, store_memory=store_memory)
 
 
 def main(args=None):
-    parser = argparse.ArgumentParser(description='Replace training data')
+    parser = argparse.ArgumentParser(description='Replace training data', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--src-w2v-model', required=True, type=str, help='Path to source word2vec model')
     parser.add_argument('--src-w2v-lowercase', action='store_true', help='Lowercase words before querying src word2vec')
     parser.add_argument('--tgt-w2v-model', required=True, type=str, help='Path to target word2vec model')
@@ -459,9 +475,15 @@ def main(args=None):
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
     parser.add_argument('--src-bpe-code', default=None, type=str, help='Path to source BPE code')
     parser.add_argument('--tgt-bpe-code', default=None, type=str, help='Path to target BPE code')
-    parser.add_argument('--memory', required=True, type=str, help='Save path to replacement memory')
+    parser.add_argument('--memory', type=str, help='Save path to replacement memory', default=None)
     parser.add_argument('--backoff', choices=['bpe', 'unk'], default='unk', metavar='BACKOFF',
                         help='Use %(metavar)s for null aligned unknown words or unknown words in many-to-many links')
+    parser.add_argument('--replace-type', required=True, choices=['1-to-1', 'multi'], 
+                        help=textwrap.dedent(
+                        '''
+                        1-to-1: Replace unknown words in 1-to-1 links only
+                        multi: Replace unknown words in 1-to-1, 1-to-many, many-to-1
+                        '''))
     # TODO: add src-sim, tgt-sim, prob, threshold
     # TODO: add embedding vocab option
 
@@ -478,7 +500,9 @@ def main(args=None):
                                 voc_path=options.vocab,
                                 src_bpe_code_path=options.src_bpe_code,
                                 tgt_bpe_code_path=options.tgt_bpe_code,
-                                backoff=options.backoff)
+                                backoff=options.backoff,
+                                replace_type=options.replace_type,
+                                store_memory=options.memory is not None)
 
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")
@@ -490,8 +514,9 @@ def main(args=None):
         replacer.set_allow_unk_character(True)
         replacer.replace_parallel_corpus(options.dev_src, options.dev_tgt, options.dev_align, options.replaced_suffix, print_per_lines=100)
 
-    logger.info("Finally writing replacement memory")
-    replacer.export_memory(options.memory)
+    if options.memory is not None:
+        logger.info("Finally writing replacement memory")
+        replacer.export_memory(options.memory)
 
 if __name__ == "__main__":
     main()
