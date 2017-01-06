@@ -231,7 +231,7 @@ class Replacer:
         candidates must be sorted by cos_sim, and then lex_prob in the descending order
         """
         best_pair = None
-        best_score = 0.0
+        best_score = float('-inf')
         assert not(len(src) > 1 and len(tgt) > 1), "At least one side has only one word"
         for candidate in candidates:
             src_word, tgt_word = candidate.src_word, candidate.tgt_word
@@ -256,6 +256,8 @@ class Replacer:
             if score > best_score:
                 best_pair = (src_word, tgt_word)
                 best_score = score
+
+        assert best_pair is not None
 
         return best_pair
 
