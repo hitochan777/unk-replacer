@@ -25,7 +25,11 @@ class JeanReplacer:
         max_prob = float("-inf")
         best_word = None
         for word, f2e_prob in candidates:
-            e2f_prob = self.lex_e2f.get_prob(cond=word, word=orig_word)
+            if self.lex_e2f is None:
+                e2f_prob = 1.0
+            else:
+                e2f_prob = self.lex_e2f.get_prob(cond=word, word=orig_word)
+
             cur_prob = f2e_prob * e2f_prob
             if cur_prob > max_prob:
                 max_prob = cur_prob
@@ -58,19 +62,25 @@ class JeanReplacer:
 
 def main(args=None):
     parser = argparse.ArgumentParser(description='Implementation of [Jean+ 2015]')
-    parser.add_argument('translation', type=str, help='Path to raw translation')
-    parser.add_argument('input', type=str, help='Original input')
-    parser.add_argument('f2e', type=str, help='Path to f2e dictionary')
-    parser.add_argument('e2f', type=str, help='Path to e2f dictionary')
+    parser.add_argument('--translation', required=True, type=str, help='Path to raw translation')
+    parser.add_argument('--input', required=True, type=str, help='Original input')
+    parser.add_argument('--f2e', required=True, type=str, help='Path to f2e dictionary')
+    parser.add_argument('--e2f', default=None, type=str, help='Path to e2f dictionary')
     parser.add_argument('--unk-tag-pattern', default="#T_UNK_(?P<f_index>\d+)#",
                         help='Regex for UNK symbol. default: %(default)s')
 
     options = parser.parse_args(args)
 
-    logger.info("Loading e2f lexical dictionary")
-    lex_e2f = LexicalDictionary.read_lex_table(options.e2f, topn=None)
+
+    if options.e2f is not None:
+        logger.info("Loading e2f lexical dictionary")
+        lex_e2f = LexicalDictionary.read_lex_table(options.e2f, topn=None)
+    else:
+        lex_e2f = None
+
     logger.info("Loading f2e lexical dictionary")
     lex_f2e = LexicalDictionary.read_lex_table(options.f2e, topn=None)
+
     replacer = JeanReplacer(lex_e2f=lex_e2f, lex_f2e=lex_f2e, unk_tag_pattern=options.unk_tag_pattern)
 
     with open(options.translation) as translations, open(options.input) as input_lines:
