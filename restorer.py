@@ -44,11 +44,18 @@ class Restorer:
             logs = json.load(logs_fs)
             attentions = json.load(attention_fs)
             for index, (translation, orig_input, replaced_input, attention, log) in enumerate(zip_longest(translations, orig_inputs, replaced_inputs, attentions, logs)):
-                translation_tokens = translation.strip().split(' ')
-                orig_input_tokens = orig_input.strip().split(' ')
-                replaced_input_tokens = replaced_input.strip().split(' ')
-                restored_translation = self.restore(translation_tokens, orig_input_tokens, replaced_input_tokens, attention, log)
-                print(restored_translation, file=output)
+                translation = translation.strip()
+                orig_input = orig_input.strip()
+                replaced_input = replaced_input.strip()
+                if len(translation) > 0:
+                    translation_tokens = translation.split(' ')
+                    orig_input_tokens = orig_input.split(' ')
+                    replaced_input_tokens = replaced_input.split(' ')
+                    restored_translation = self.restore(translation_tokens, orig_input_tokens, replaced_input_tokens, attention, log)
+                    print(restored_translation, file=output)
+                else:
+                    print("" ,file=output)
+
                 if (index + 1) % self.print_every == 0:
                     logger.info("Finished processing up to %d-th line" % (index + 1, ))
 
