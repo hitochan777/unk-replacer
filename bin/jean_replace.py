@@ -2,7 +2,7 @@ import argparse
 import re
 from typing import List
 
-from src.lexical_dictionary import LexicalDictionary
+from replacer.lexical_dictionary import LexicalDictionary
 
 
 class JeanReplacer:

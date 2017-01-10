@@ -6,7 +6,7 @@ import logging
 import sys
 from typing import List, Tuple
 
-from src.bpe import learn_bpe
+from replacer.bpe import learn_bpe
 
 logger = logging.getLogger(__name__)
 

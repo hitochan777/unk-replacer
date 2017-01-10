@@ -5,7 +5,7 @@ from typing import List, Tuple
 from itertools import zip_longest
 import re
 
-from src.lexical_dictionary import LexicalDictionary
+from replacer.lexical_dictionary import LexicalDictionary
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

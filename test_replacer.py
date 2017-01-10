@@ -4,9 +4,9 @@ import json
 from os import path
 import logging
 
-from src.bpe.apply_bpe import BPE
-from src.word2vec import Word2Vec
-from src.collections import Trie
+from replacer.bpe.apply_bpe import BPE
+from replacer.word2vec import Word2Vec
+from replacer.collections import Trie
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from src.collections import Trie
+from replacer.collections import Trie
 
 
 class TestTrie(TestCase):
