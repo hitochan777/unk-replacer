@@ -11,10 +11,10 @@ from os import path
 import json
 from typing import Dict, List, Iterable, Union, Tuple
 
-from src.lexical_dictionary import LexicalDictionary
-from src.alignment import Alignment
-from src.bpe.apply_bpe import BPE
-from src.word2vec import Word2Vec
+from replacer.lexical_dictionary import LexicalDictionary
+from replacer.alignment import Alignment
+from replacer.bpe.apply_bpe import BPE
+from replacer.word2vec import Word2Vec
 
 logger = logging.getLogger(__name__)
 
