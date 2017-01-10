@@ -1,8 +1,12 @@
 import argparse
 import re
 from typing import List
+import logging
 
 from replacer.lexical_dictionary import LexicalDictionary
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class JeanReplacer:
@@ -17,7 +21,7 @@ class JeanReplacer:
         if orig_word in self.cache:
             return self.cache[orig_word]
 
-        candidates = self.lex_f2e.get_translations(orig_word)
+        candidates = self.lex_f2e.get_translations(orig_word, only_in_vocab=False)
         max_prob = float("-inf")
         best_word = None
         for word, f2e_prob in candidates:
@@ -36,7 +40,7 @@ class JeanReplacer:
 
     def replace(self, translation: List[str], orig: List[str]) -> List[str]:
         final_translation = list(translation)  # clone translation
-        for tgt_word in translation:
+        for e_index, tgt_word in enumerate(translation):
             match = re.search(self.unk_tag_pattern, tgt_word)
             if match is None:
                 continue
@@ -44,7 +48,9 @@ class JeanReplacer:
             f_index = int(match.group("f_index"))
             orig_word = orig[f_index]
             best_word = self.get_best_translation(orig_word)
-            final_translation[f_index] = best_word
+            final_translation[e_index] = best_word
+
+        return final_translation
 
     def clear_cache(self):
         self.cache = {}
@@ -61,12 +67,14 @@ def main(args=None):
 
     options = parser.parse_args(args)
 
+    logger.info("Loading e2f lexical dictionary")
     lex_e2f = LexicalDictionary.read_lex_table(options.e2f, topn=None)
+    logger.info("Loading f2e lexical dictionary")
     lex_f2e = LexicalDictionary.read_lex_table(options.f2e, topn=None)
     replacer = JeanReplacer(lex_e2f=lex_e2f, lex_f2e=lex_f2e, unk_tag_pattern=options.unk_tag_pattern)
 
     with open(options.translation) as translations, open(options.input) as input_lines:
-        for input_line, translation in zip(translations, input_lines):
+        for input_line, translation in zip(input_lines, translations):
             src_words = input_line.strip().split(" ")
             tgt_words = translation.strip().split(" ")
             final_translation = replacer.replace(tgt_words, src_words)
