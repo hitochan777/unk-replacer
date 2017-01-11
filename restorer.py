@@ -51,6 +51,9 @@ class Restorer:
                     translation_tokens = translation.split(' ')
                     orig_input_tokens = orig_input.split(' ')
                     replaced_input_tokens = replaced_input.split(' ')
+                    if isinstance(attention, dict):
+                        attention = attention["attn"]
+
                     restored_translation = self.restore(translation_tokens, orig_input_tokens, replaced_input_tokens, attention, log)
                     print(restored_translation, file=output)
                 else:
