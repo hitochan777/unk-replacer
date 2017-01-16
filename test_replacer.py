@@ -161,11 +161,12 @@ class Replacer:
             json.dump(logs, log_fs)
 
     @classmethod
-    def build_memory(cls, memory_list: List):
+    def build_memory(cls, memory_list: List, min_freq: int=0):
         trie = Trie()
         for memory in memory_list:
-            assert isinstance(memory[1], int), memory
-            trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
+            assert isinstance(memory[1], int), memory  # replacement freq
+            if memory[1] >= min_freq:
+                trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
 
         trie.prune()
         return trie
@@ -175,7 +176,7 @@ class Replacer:
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
                 bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
-                use_all_memory: bool=False):
+                use_all_memory: bool=False, memory_min_freq: int=0):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -192,7 +193,7 @@ class Replacer:
             logger.info("Building memory")
             with open(memory, 'r') as f:
                 memory_list = json.load(f)
-                memory = cls.build_memory(memory_list)  # type: Trie
+                memory = cls.build_memory(memory_list, memory_min_freq)  # type: Trie
 
         if bpe_code_path is not None:
             logger.info("Loading BPE codes")
@@ -229,6 +230,7 @@ def main(args=None):
     parser.add_argument('--too-common-threshold', type=int, default=5000, metavar="K",
                         help='If all the words in a original source phrase in the memory appear in top %(metavar)s most frequent words in the vocabulary, do not trust the memory and do not replace')
     parser.add_argument('--use-all-memory', action='store_true', help='If not set, replacement memories with at least one unknown words are used')
+    parser.add_argument('--memory-min-freq', type=int, default=0, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
 
     options = parser.parse_args(args)
 
@@ -242,7 +244,8 @@ def main(args=None):
                                 memory=options.memory,
                                 backoff=options.backoff,
                                 too_common_threshold=options.too_common_threshold,
-                                use_all_memory=options.use_all_memory)
+                                use_all_memory=options.use_all_memory,
+                                memory_min_freq=options.memory_min_freq)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
