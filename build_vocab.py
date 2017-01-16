@@ -2,16 +2,18 @@ import argparse
 import collections
 import operator
 import json
+import re
 import logging
 import sys
 from typing import List, Tuple
 
 from replacer.bpe import learn_bpe
+from replacer.number_normalizer import NumberHandler
 
 logger = logging.getLogger(__name__)
 
 
-def build_word_vocab(fn, voc_limit=None, max_nb_ex=None):
+def build_word_vocab(fn, voc_limit=None, max_nb_ex=None, handle_number=False):
     if max_nb_ex is not None:
         logger.info("Using the first %d lines in training data" % max_nb_ex)
 
@@ -22,10 +24,26 @@ def build_word_vocab(fn, voc_limit=None, max_nb_ex=None):
             break
         line = line.rstrip().split(" ")
         for w in line:
-            counts[w] += 1
+            if handle_number:
+                sub_words = NumberHandler.process_number(w).split(' ')
+                for sub_word in sub_words:
+                    counts[sub_word] += 1
+            else:
+                counts[w] += 1
 
     sorted_counts = sorted(counts.items(), key=operator.itemgetter(1, 0), reverse=True)
     voc = list(map(operator.itemgetter(0), sorted_counts[:voc_limit]))
+    if handle_number:
+        word_voc = []
+        sub_word_voc = []
+        for word in voc:
+            if word.startswith('_') or re.search(r'^<@num: .+>$', word) is not None:
+                sub_word_voc.append(word)
+            else:
+                word_voc.append(word)
+
+        voc = word_voc + sub_word_voc
+
     f.close()
     return voc
 
@@ -46,6 +64,7 @@ def main(args=None):
     parser_word.add_argument('--tgt-vocab-size', default=30000, type=int, help='Target vocabulary size')
     parser_word.add_argument('--max-nb-ex', default=None, type=int, help='Max number of lines to build vocabulary')
     parser_word.add_argument('--output-file', required=True, type=str, help='Output filename')
+    parser_word.add_argument('-n', '--handle-number', action='store_true', help='Special handling of numbers')
 
     parser_bpe = subparsers.add_parser('bpe', help='bpe help')
     parser_bpe.add_argument('--source-file', required=True, type=str, help='Training file for source language')
@@ -58,8 +77,10 @@ def main(args=None):
     options = parser.parse_args(args)
 
     if options.sub_command == "word":
-        src_voc = build_word_vocab(options.source_file, voc_limit=options.src_vocab_size, max_nb_ex=options.max_nb_ex)
-        tgt_voc = build_word_vocab(options.target_file, voc_limit=options.tgt_vocab_size, max_nb_ex=options.max_nb_ex)
+        src_voc = build_word_vocab(options.source_file, voc_limit=options.src_vocab_size, max_nb_ex=options.max_nb_ex,
+                                   handle_number=options.handle_number)
+        tgt_voc = build_word_vocab(options.target_file, voc_limit=options.tgt_vocab_size, max_nb_ex=options.max_nb_ex,
+                                   handle_number=options.handle_number)
     elif options.sub_command == "bpe":
         src_voc = build_bpe_vocab(options.source_file, voc_limit=options.src_vocab_size, max_nb_ex=options.max_nb_ex)
         tgt_voc = build_bpe_vocab(options.target_file, voc_limit=options.tgt_vocab_size, max_nb_ex=options.max_nb_ex)
