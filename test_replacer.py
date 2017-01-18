@@ -219,7 +219,7 @@ def main(args=None):
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
     parser.add_argument('--bpe-code', default=None, type=str, help='Path to source BPE code')
     parser.add_argument('--memory', default=None, type=str, help='Path to replacement memory')
-    parser.add_argument('--sim-threshold', default=0.6, type=str,
+    parser.add_argument('--sim-threshold', default=0.6, type=float,
                         help='Threshold value for source cosine similarity')
     parser.add_argument('--emb-vocab-size', metavar='K',
                         type=int, default=10000, help='Use top %(metavar)s most frequent in-vocab words as replacement')

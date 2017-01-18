@@ -222,7 +222,7 @@ class Restorer:
                             return
 
                 self.nb_no_dic_entry += 1
-                logger.info("[2:copy] %s ➔ %s" % (translation[best_index], best_word))
+                logger.info("[2:copy] %s ➔ %s" % (translation[best_index], orig_src_seq))
                 recovered_translation[best_index] = orig_src_seq
                 is_recovered[best_index] = True
                 self.count_back_substitute += 1
@@ -298,8 +298,11 @@ class Restorer:
             assert after_min == min(idx_after)
             assert after_max == max(idx_after)
 
-            l1 = l1[:before_min] + l1[before_max + 1:]
-            l2 = l2[:after_min] + l2[after_max + 1:]
+            l1[before_min:before_max+1] = [None] * len(idx_before)
+            l2[after_min:after_max+1] = [None] * len(idx_after)
+
+        l1 = [x for x in l1 if x is not None]
+        l2 = [x for x in l2 if x is not None]
 
         assert len(l1) == len(l2), (len(l1), len(l2))
 
@@ -312,7 +315,7 @@ class Restorer:
                 continue
 
             f_index = int(m.group("f_index"))
-            assert f_index in orig_idx_dic, (f_index, orig_idx_dic)
+            assert f_index in orig_idx_dic, (f_index, orig_idx_dic, log)
 
             orig_idx = orig_idx_dic[f_index]
             orig_word = orig_src[orig_idx]
@@ -361,6 +364,8 @@ class Restorer:
                 memory = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
                 for (orig_src, orig_tgt, rep_src, rep_tgt), freq in memory_list:
                     memory[rep_src][rep_tgt][orig_src].append(orig_tgt)
+        else:
+            memory = None
 
         return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n)
 
