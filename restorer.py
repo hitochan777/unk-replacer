@@ -193,7 +193,7 @@ class Restorer:
 
                 if self.memory is None:
                     assert orig_src_seq_len == 1
-                    best_word, in_dict = self.get_best_lexical_translation(orig_src_seq_len)
+                    best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
                     if in_dict:
                         logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
                         recovered_translation[best_index] = best_word
