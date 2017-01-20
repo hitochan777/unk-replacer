@@ -107,15 +107,9 @@ class Restorer:
             if translation[eIndex].endswith(("@@", "</w>")) or (eIndex > 0 and translation[eIndex - 1].endswith(("@@", "</w>"))):
                 continue
 
-            if self.memory is None:
-                prob_e2f = self.lex_e2f.get_prob(cond=replaced_src_word, word=translation[eIndex])  # type: float
-                prob_f2e = self.lex_f2e.get_prob(cond=translation[eIndex], word=replaced_src_word)  # type: float
-                score = (prob_e2f + prob_f2e)/2.0 * attention_prob
-            else:
-                if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
-                    score = attention_prob
-                else:
-                    continue
+            prob_e2f = self.lex_e2f.get_prob(cond=translation[eIndex], word=replaced_src_word)  # type: float
+            prob_f2e = self.lex_f2e.get_prob(cond=replaced_src_word, word=translation[eIndex])  # type: float
+            score = (prob_e2f + prob_f2e)/2.0 * attention_prob
 
             if score <= 0.0:
                 continue
@@ -144,7 +138,6 @@ class Restorer:
 
                 if orig_src_seq_len == 1:
                     best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
-                    assert type(best_word) == str, best_word
                     if in_dict:
                         logger.info("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                         recovered_translation[e_index_with_max_score] = best_word
