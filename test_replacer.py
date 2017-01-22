@@ -16,7 +16,7 @@ class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
                  memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
-                 too_common_threshold=5000, mem_with_unk_only=True) -> None:
+                 too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False) -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
@@ -30,14 +30,18 @@ class Replacer:
 
         self.too_common_threshold = too_common_threshold
         self.mem_with_unk_only = mem_with_unk_only
+        self.force_word2vec_for_one_word = force_word2vec_for_one_word
 
     def get_replace_by_memory_lookup(self, seq: List[str]):
-        new_seq = []
         start_idx = 0
         replacements = []
         while start_idx < len(seq):
             replaced_str, index = self.memory.get_longest_match(seq[start_idx:])
             if replaced_str is not None:
+                if self.force_word2vec_for_one_word and index == 1:
+                    start_idx += 1
+                    continue
+
                 assert index is not None
                 src_words = seq[start_idx:start_idx+index]
                 all_too_common = all(word in self.voc[:self.too_common_threshold] for word in src_words)
@@ -59,7 +63,6 @@ class Replacer:
 
                 start_idx += index
             else:
-                new_seq.append(seq[start_idx])
                 start_idx += 1
 
         return replacements
@@ -176,7 +179,8 @@ class Replacer:
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
                 bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
-                use_all_memory: bool=False, memory_min_freq: int=0):
+                use_all_memory: bool=False, memory_min_freq: int=1,
+                force_word2vec_for_one_word: bool=False):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -203,7 +207,7 @@ class Replacer:
             bpe = None
         
         logger.info("Building replacer")
-        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory)
+        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word)
 
 
 def main(args=None):
@@ -230,7 +234,9 @@ def main(args=None):
     parser.add_argument('--too-common-threshold', type=int, default=5000, metavar="K",
                         help='If all the words in a original source phrase in the memory appear in top %(metavar)s most frequent words in the vocabulary, do not trust the memory and do not replace')
     parser.add_argument('--use-all-memory', action='store_true', help='If not set, replacement memories with at least one unknown words are used')
-    parser.add_argument('--memory-min-freq', type=int, default=0, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
+    parser.add_argument('--memory-min-freq', type=int, default=1, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
+    parser.add_argument('--force-word2vec-for-one-word', action='store_true', help='If set, word2vec is used for one word even if replacement memory exits')
+    
 
     options = parser.parse_args(args)
 
@@ -245,7 +251,8 @@ def main(args=None):
                                 backoff=options.backoff,
                                 too_common_threshold=options.too_common_threshold,
                                 use_all_memory=options.use_all_memory,
-                                memory_min_freq=options.memory_min_freq)
+                                memory_min_freq=options.memory_min_freq,
+                                force_word2vec_for_one_word=options.force_word2vec_for_one_word)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
