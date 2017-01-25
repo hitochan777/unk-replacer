@@ -41,6 +41,7 @@ class Restorer:
                      replaced_input_path: str, output_path: str, attention_path: str, log_path: str) -> None:
         with open(translation_path, 'r') as translations, open(orig_input_path, 'r') as orig_inputs, \
                 open(replaced_input_path, 'r') as replaced_inputs, open(attention_path, 'r') as attention_fs, open(log_path, 'r') as logs_fs, open(output_path, 'w') as output:
+
             logs = json.load(logs_fs)
             attentions = json.load(attention_fs)
             for index, (translation, orig_input, replaced_input, attention, log) in enumerate(zip_longest(translations, orig_inputs, replaced_inputs, attentions, logs)):
@@ -376,10 +377,15 @@ def main(args=None):
     parser.add_argument('--memory', default=None, type=str, help='Path to replacement memory')
     parser.add_argument('--replace-log', required=True, type=str, help='Path to replacement log')
     parser.add_argument('--attention', required=True, type=str, help='Path to attention')
-    parser.add_argument('-b', '--lex-backoff', action='store_true', 
+    parser.add_argument('-b', '--lex-backoff', action='store_true',
                         help='Use lexical table when entry is not found in memory')
 
     options = parser.parse_args(args)
+
+    # write out command line options to a file in JSON format
+    option_log_path = options.output + ".restore.config.json"
+    with open(option_log_path, "w") as option_log:
+        json.dump(vars(options), file=option_log)
 
     replacer = Restorer.factory(lex_e2f_path=options.lex_e2f,
                                 lex_f2e_path=options.lex_f2e,
