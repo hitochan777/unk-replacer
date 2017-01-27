@@ -241,9 +241,9 @@ def main(args=None):
     options = parser.parse_args(args)
 
     # write out command line options to a file in JSON format
-    option_log_path = input_file + suffix + "test_replacer.config.json"
+    option_log_path = options.input + options.replaced_suffix + ".test_replacer.config.json"
     with open(option_log_path, "w") as option_log:
-        json.dump(vars(options), file=option_log)
+        json.dump(vars(options), option_log)
 
     replacer = Replacer.factory(w2v_model_path=options.w2v_model,
                                 w2v_model_topn=options.w2v_model_topn,

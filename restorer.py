@@ -385,7 +385,7 @@ def main(args=None):
     # write out command line options to a file in JSON format
     option_log_path = options.output + ".restore.config.json"
     with open(option_log_path, "w") as option_log:
-        json.dump(vars(options), file=option_log)
+        json.dump(vars(options), option_log)
 
     replacer = Restorer.factory(lex_e2f_path=options.lex_e2f,
                                 lex_f2e_path=options.lex_f2e,
