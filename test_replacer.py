@@ -7,6 +7,7 @@ import logging
 from replacer.bpe.apply_bpe import BPE
 from replacer.word2vec import Word2Vec
 from replacer.collections import Trie
+from replacer.number_normalizer import process_number
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
                  memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
-                 too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False) -> None:
+                 too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False,
+                 handle_numbers: bool=False) -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
@@ -31,6 +33,8 @@ class Replacer:
         self.too_common_threshold = too_common_threshold
         self.mem_with_unk_only = mem_with_unk_only
         self.force_word2vec_for_one_word = force_word2vec_for_one_word
+
+        self.handle_numbers = handle_numbers
 
     def get_replace_by_memory_lookup(self, seq: List[str]):
         start_idx = 0
@@ -71,6 +75,17 @@ class Replacer:
         new_seq = list(seq)  # clone seq
         actions = []
         assert self.emb is not None
+
+        if self.handle_numbers:
+            for index, word in enumerate(seq):
+                new_word = process_number(word)  # note that process word returns the word itself if it contains no number related characters.
+                if new_word != word:
+                    actions.append(
+                        (
+                            (index, index + 1),
+                            new_word
+                        )
+                    )
 
         # memory lookup
         if self.memory is not None:
@@ -180,7 +195,7 @@ class Replacer:
                 bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
                 use_all_memory: bool=False, memory_min_freq: int=1,
-                force_word2vec_for_one_word: bool=False):
+                force_word2vec_for_one_word: bool=False, handle_numbers: bool=False):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -207,7 +222,7 @@ class Replacer:
             bpe = None
         
         logger.info("Building replacer")
-        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word)
+        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word, handle_numbers=handle_numbers)
 
 
 def main(args=None):
@@ -236,7 +251,7 @@ def main(args=None):
     parser.add_argument('--use-all-memory', action='store_true', help='If not set, replacement memories with at least one unknown words are used')
     parser.add_argument('--memory-min-freq', type=int, default=1, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
     parser.add_argument('--force-word2vec-for-one-word', action='store_true', help='If set, word2vec is used for one word even if replacement memory exits')
-    
+    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
 
     options = parser.parse_args(args)
 
@@ -257,7 +272,8 @@ def main(args=None):
                                 too_common_threshold=options.too_common_threshold,
                                 use_all_memory=options.use_all_memory,
                                 memory_min_freq=options.memory_min_freq,
-                                force_word2vec_for_one_word=options.force_word2vec_for_one_word)
+                                force_word2vec_for_one_word=options.force_word2vec_for_one_word,
+                                handle_numbers=options.handle_numbers)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 

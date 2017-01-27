@@ -76,7 +76,7 @@ class Alignment(object):
         return scc
 
     @classmethod
-    def get_scc_without_unknowns(cls, alignment: Union[Dict, str], src: List[str],
+    def get_scc_with_unknowns(cls, alignment: Union[Dict, str], src: List[str],
                                     tgt: List[str], src_voc: Iterator[str], tgt_voc: Iterator[str]):
 
         scc = cls.enum_scc(alignment, len(src), len(tgt))
