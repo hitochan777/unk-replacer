@@ -7,7 +7,7 @@ import logging
 from replacer.bpe.apply_bpe import BPE
 from replacer.word2vec import Word2Vec
 from replacer.collections import Trie
-from replacer.number_normalizer import process_number
+from replacer.number_normalizer import NumberHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class Replacer:
 
         if self.handle_numbers:
             for index, word in enumerate(seq):
-                new_word = process_number(word)  # note that process word returns the word itself if it contains no number related characters.
+                new_word =NumberHandler.process_number(word)  # note that process word returns the word itself if it contains no number related characters.
                 if new_word != word:
                     actions.append(
                         (

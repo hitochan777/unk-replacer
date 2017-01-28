@@ -15,7 +15,7 @@ from replacer.lexical_dictionary import LexicalDictionary
 from replacer.alignment import Alignment
 from replacer.bpe.apply_bpe import BPE
 from replacer.word2vec import Word2Vec
-from replacer.number_normalizer import process_number
+from replacer.number_normalizer import NumberHandler
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +126,8 @@ class Replacer:
     def replace(self, src: List[str], tgt: List[str], align: Dict[int, List[int]]) -> List[str]:
         unk_scc = Alignment.get_scc_with_unknowns(align, src, tgt, self.src_voc, self.tgt_voc)
         if self.handle_numbers:
-            new_src = list(map(lambda x: process_number(word), src))
-            new_tgt = list(map(lambda x: process_number(word), tgt))
+            new_src = list(map(lambda x: NumberHandler.process_number(word), src))
+            new_tgt = list(map(lambda x: NumberHandler.process_number(word), tgt))
             assert len(new_src) == len(src)
             assert len(new_tgt) == len(tgt)
             src_changed = [new_src[i] != src[i] for i in range(len(src))]
@@ -147,7 +147,7 @@ class Replacer:
                         break
 
                 for e_index in e_indices:
-                    if tgt_changed[e_index]
+                    if tgt_changed[e_index]:
                         contain_numbers = True
                         break
 
