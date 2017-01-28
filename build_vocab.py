@@ -37,7 +37,7 @@ def build_word_vocab(fn, voc_limit=None, max_nb_ex=None, handle_number=False):
         word_voc = []
         sub_word_voc = []
         for word in voc:
-            if word.startswith('_') or re.search(r'^<@num: .+>$', word) is not None:
+            if word.startswith('_') or re.search(r'^<@num:.+>$', word) is not None:
                 sub_word_voc.append(word)
             else:
                 word_voc.append(word)

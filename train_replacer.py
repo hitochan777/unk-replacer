@@ -15,6 +15,7 @@ from replacer.lexical_dictionary import LexicalDictionary
 from replacer.alignment import Alignment
 from replacer.bpe.apply_bpe import BPE
 from replacer.word2vec import Word2Vec
+from replacer.number_normalizer import NumberHandler
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class Replacer:
                  src_voc: Iterable[str], tgt_voc: Iterable[str],
                  src_bpe: BPE, tgt_bpe: BPE,
                  lex_prob_threshold: float=0.3, src_sim_threshold: float=0.5, tgt_sim_threshold: float=0.5,
-                 allow_unk_character: bool=True, backoff: str="unk") -> None:
+                 allow_unk_character: bool=True, backoff: str="unk", handle_numbers: bool=False) -> None:
 
         self.src_emb = src_emb
         self.tgt_emb = tgt_emb
@@ -56,6 +57,12 @@ class Replacer:
 
         logger.info("Memorization of replacement is %s" % ("ON" if store_memory else "OFF"))
         self.store_memory = store_memory
+
+        logger.info('Applying special handling to numbers')
+        self.handle_numbers = handle_numbers
+
+        if handle_numbers:
+            assert backoff == 'unk'
 
     def set_allow_unk_character(self, allow_unk_character):
         self.allow_unk_character = allow_unk_character
@@ -117,10 +124,36 @@ class Replacer:
         return " ".join(new_seq)
 
     def replace(self, src: List[str], tgt: List[str], align: Dict[int, List[int]]) -> List[str]:
+        unk_scc = Alignment.get_scc_with_unknowns(align, src, tgt, self.src_voc, self.tgt_voc)
+        if self.handle_numbers:
+            new_src = list(map(lambda word: NumberHandler.process_number(word), src))
+            new_tgt = list(map(lambda word: NumberHandler.process_number(word), tgt))
+            assert len(new_src) == len(src)
+            assert len(new_tgt) == len(tgt)
+            src_changed = [new_src[i] != src[i] for i in range(len(src))]
+            tgt_changed = [new_tgt[i] != tgt[i] for i in range(len(tgt))]
+            src = new_src
+            tgt = new_tgt
+
         new_src_seq = list(src)  # clone src
         new_tgt_seq = list(tgt)  # clone tgt
-        unk_scc = Alignment.get_scc_without_unknowns(align, src, tgt, self.src_voc, self.tgt_voc)
+
         for f_indices, e_indices in unk_scc:
+            if self.handle_numbers:
+                contain_numbers = False
+                for f_index in f_indices:
+                    if src_changed[f_index]:
+                        contain_numbers = True
+                        break
+
+                for e_index in e_indices:
+                    if tgt_changed[e_index]:
+                        contain_numbers = True
+                        break
+
+                if contain_numbers:
+                    continue
+
             if len(f_indices) == 0:  # null alignment
                 assert len(e_indices) == 1
                 if self.backoff == "unk":
@@ -391,7 +424,7 @@ class Replacer:
     def factory(cls, replace_type: str, store_memory: bool, src_w2v_model_path, tgt_w2v_model_path, src_w2v_model_topn,
                 lex_e2f_path, lex_f2e_path, lex_topn, voc_path, src_w2v_lowercase=False,
                 tgt_w2v_lowercase=False, src_bpe_code_path: str=None, tgt_bpe_code_path: str=None,
-                backoff: str="unk"):
+                backoff: str="unk", handle_numbers: bool=False):
         logger.info("Loading vocabulary from %s" % voc_path)
         with open(voc_path, 'r') as f:
             vocab = json.load(f)
@@ -448,7 +481,8 @@ class Replacer:
         return cls(src_emb=src_emb, tgt_emb=tgt_emb, lex_e2f=lex_e2f,
                    lex_f2e=lex_f2e, src_voc=src_voc, tgt_voc=tgt_voc,
                    src_bpe=src_bpe, tgt_bpe=tgt_bpe, backoff=backoff,
-                   replace_type=replace_type, store_memory=store_memory)
+                   replace_type=replace_type, store_memory=store_memory,
+                   handle_numbers=handle_numbers)
 
 
 def main(args=None):
@@ -484,6 +518,7 @@ def main(args=None):
                         1-to-1: Replace unknown words in 1-to-1 links only
                         multi: Replace unknown words in 1-to-1, 1-to-many, many-to-1
                         '''))
+    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, ')
     # TODO: add src-sim, tgt-sim, prob, threshold
     # TODO: add embedding vocab option
 
@@ -502,7 +537,8 @@ def main(args=None):
                                 tgt_bpe_code_path=options.tgt_bpe_code,
                                 backoff=options.backoff,
                                 replace_type=options.replace_type,
-                                store_memory=options.memory is not None)
+                                store_memory=options.memory is not None,
+                                handle_numbers=options.handle_numbers)
 
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")

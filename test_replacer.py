@@ -7,6 +7,7 @@ import logging
 from replacer.bpe.apply_bpe import BPE
 from replacer.word2vec import Word2Vec
 from replacer.collections import Trie
+from replacer.number_normalizer import NumberHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
                  memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
-                 too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False) -> None:
+                 too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False,
+                 handle_numbers: bool=False) -> None:
 
         self.emb = emb  # type: Word2Vec
         self.sim_threshold = sim_threshold  # type: float
@@ -32,16 +34,14 @@ class Replacer:
         self.mem_with_unk_only = mem_with_unk_only
         self.force_word2vec_for_one_word = force_word2vec_for_one_word
 
+        self.handle_numbers = handle_numbers
+
     def get_replace_by_memory_lookup(self, seq: List[str]):
         start_idx = 0
         replacements = []
         while start_idx < len(seq):
             replaced_str, index = self.memory.get_longest_match(seq[start_idx:])
             if replaced_str is not None:
-                if self.force_word2vec_for_one_word and index == 1:
-                    start_idx += 1
-                    continue
-
                 assert index is not None
                 src_words = seq[start_idx:start_idx+index]
                 all_too_common = all(word in self.voc[:self.too_common_threshold] for word in src_words)
@@ -71,6 +71,17 @@ class Replacer:
         new_seq = list(seq)  # clone seq
         actions = []
         assert self.emb is not None
+
+        if self.handle_numbers:
+            for index, word in enumerate(seq):
+                new_word =NumberHandler.process_number(word)  # note that process word returns the word itself if it contains no number related characters.
+                if new_word != word:
+                    actions.append(
+                        (
+                            (index, index + 1),
+                            new_word
+                        )
+                    )
 
         # memory lookup
         if self.memory is not None:
@@ -164,12 +175,13 @@ class Replacer:
             json.dump(logs, log_fs)
 
     @classmethod
-    def build_memory(cls, memory_list: List, min_freq: int=0):
+    def build_memory(cls, memory_list: List, min_freq: int=0, force_word2vec_for_one_word: bool=False):
         trie = Trie()
         for memory in memory_list:
             assert isinstance(memory[1], int), memory  # replacement freq
             if memory[1] >= min_freq:
-                trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
+                if not force_word2vec_for_one_word or len(memory[0][0].split(' ')) > 1:
+                    trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
 
         trie.prune()
         return trie
@@ -180,7 +192,7 @@ class Replacer:
                 bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
                 use_all_memory: bool=False, memory_min_freq: int=1,
-                force_word2vec_for_one_word: bool=False):
+                force_word2vec_for_one_word: bool=False, handle_numbers: bool=False):
 
         logger.info("Loading vocabulary")
         with open(voc_path, 'r') as f:
@@ -197,7 +209,7 @@ class Replacer:
             logger.info("Building memory")
             with open(memory, 'r') as f:
                 memory_list = json.load(f)
-                memory = cls.build_memory(memory_list, memory_min_freq)  # type: Trie
+                memory = cls.build_memory(memory_list, memory_min_freq, force_word2vec_for_one_word)  # type: Trie
 
         if bpe_code_path is not None:
             logger.info("Loading BPE codes")
@@ -207,7 +219,7 @@ class Replacer:
             bpe = None
         
         logger.info("Building replacer")
-        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word)
+        return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word, handle_numbers=handle_numbers)
 
 
 def main(args=None):
@@ -236,7 +248,7 @@ def main(args=None):
     parser.add_argument('--use-all-memory', action='store_true', help='If not set, replacement memories with at least one unknown words are used')
     parser.add_argument('--memory-min-freq', type=int, default=1, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
     parser.add_argument('--force-word2vec-for-one-word', action='store_true', help='If set, word2vec is used for one word even if replacement memory exits')
-    
+    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
 
     options = parser.parse_args(args)
 
@@ -257,7 +269,8 @@ def main(args=None):
                                 too_common_threshold=options.too_common_threshold,
                                 use_all_memory=options.use_all_memory,
                                 memory_min_freq=options.memory_min_freq,
-                                force_word2vec_for_one_word=options.force_word2vec_for_one_word)
+                                force_word2vec_for_one_word=options.force_word2vec_for_one_word,
+                                handle_numbers=options.handle_numbers)
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
