@@ -126,8 +126,14 @@ class Replacer:
     def replace(self, src: List[str], tgt: List[str], align: Dict[int, List[int]]) -> List[str]:
         unk_scc = Alignment.get_scc_with_unknowns(align, src, tgt, self.src_voc, self.tgt_voc)
         if self.handle_numbers:
-            src = list(map(lambda x: process_number(word), src))
-            tgt = list(map(lambda x: process_number(word), tgt))
+            new_src = list(map(lambda x: process_number(word), src))
+            new_tgt = list(map(lambda x: process_number(word), tgt))
+            assert len(new_src) == len(src)
+            assert len(new_tgt) == len(tgt)
+            src_changed = [new_src[i] != src[i] for i in range(len(src))]
+            tgt_changed = [new_tgt[i] != tgt[i] for i in range(len(tgt))]
+            src = new_src
+            tgt = new_tgt
 
         new_src_seq = list(src)  # clone src
         new_tgt_seq = list(tgt)  # clone tgt
@@ -136,12 +142,12 @@ class Replacer:
             if self.handle_numbers:
                 contain_numbers = False
                 for f_index in f_indices:
-                    if len(src[f_index].split(' ')) > 1:
+                    if src_changed[f_index]:
                         contain_numbers = True
                         break
 
                 for e_index in e_indices:
-                    if len(tgt[e_index].split(' ')) > 1:
+                    if tgt_changed[e_index]
                         contain_numbers = True
                         break
 
