@@ -42,4 +42,5 @@ class TestNumberHandler(TestCase):
         self.assertEqual(NumberHandler.process_number('１／４'), '１ _／ _４')
         self.assertEqual(NumberHandler.process_number('CO2'), 'CO _2')
         self.assertEqual(NumberHandler.process_number('Word2vec'), 'Word _2 _vec')
+        self.assertEqual(NumberHandler.process_number('ISO14001'), 'ISO _1 _4 _0 _0 _1')       
 
