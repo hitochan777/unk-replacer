@@ -15,7 +15,6 @@ pickleshare==0.7.4
 prompt-toolkit==1.0.9
 ptyprocess==0.5.1
 Pygments==2.1.3
--e git+git@github.com:hitochan777/replacer.git@5dfd368e3503da156d26e8c83d2f8af8c4ba1837#egg=replacer
 requests==2.12.3
 scipy==0.18.1
 simplegeneric==0.8.1
