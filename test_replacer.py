@@ -42,10 +42,6 @@ class Replacer:
         while start_idx < len(seq):
             replaced_str, index = self.memory.get_longest_match(seq[start_idx:])
             if replaced_str is not None:
-                if self.force_word2vec_for_one_word and index == 1:
-                    start_idx += 1
-                    continue
-
                 assert index is not None
                 src_words = seq[start_idx:start_idx+index]
                 all_too_common = all(word in self.voc[:self.too_common_threshold] for word in src_words)
@@ -179,12 +175,13 @@ class Replacer:
             json.dump(logs, log_fs)
 
     @classmethod
-    def build_memory(cls, memory_list: List, min_freq: int=0):
+    def build_memory(cls, memory_list: List, min_freq: int=0, force_word2vec_for_one_word: bool=False):
         trie = Trie()
         for memory in memory_list:
             assert isinstance(memory[1], int), memory  # replacement freq
             if memory[1] >= min_freq:
-                trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
+                if not force_word2vec_for_one_word or len(memory[0][0].split(' ')) > 1:
+                    trie.add(memory[0][0].split(' '), memory[0][2], memory[1])
 
         trie.prune()
         return trie
@@ -212,7 +209,7 @@ class Replacer:
             logger.info("Building memory")
             with open(memory, 'r') as f:
                 memory_list = json.load(f)
-                memory = cls.build_memory(memory_list, memory_min_freq)  # type: Trie
+                memory = cls.build_memory(memory_list, memory_min_freq, force_word2vec_for_one_word)  # type: Trie
 
         if bpe_code_path is not None:
             logger.info("Loading BPE codes")
