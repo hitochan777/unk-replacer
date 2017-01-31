@@ -9,10 +9,10 @@ def main(args=None):
                                                  'and p1\'s word alignment, '
                                                  'return word alignment for p2')
 
-    parser.add_argument('first-src', type=str, help='Path to p1 source file')
-    parser.add_argument('first-tgt', type=str, help='Path to p1 source file')
-    parser.add_argument('second-src', type=str, help='Path to p2 source file')
-    parser.add_argument('second-tgt', type=str, help='Path to p2 source file')
+    parser.add_argument('first_src', type=str, help='Path to p1 source file')
+    parser.add_argument('first_tgt', type=str, help='Path to p1 source file')
+    parser.add_argument('second_src', type=str, help='Path to p2 source file')
+    parser.add_argument('second_tgt', type=str, help='Path to p2 source file')
     parser.add_argument('alignment', type=str, help='Path to word alignment file to p1')
 
     options = parser.parse_args(args)
@@ -22,7 +22,7 @@ def main(args=None):
         open(options.alignment) as alignments:
 
         for sb, tb, sa, ta, align in zip(first_src, first_tgt, second_src, second_tgt, alignments):
-            new_align_str = Alignment.get_adjusted_alignment(sb.split(' '), tb.split(' '), sa.split(' '), ta.split(' '), align)
+            new_align_str = Alignment.get_adjusted_alignment(sb.strip().split(' '), tb.strip().split(' '), sa.strip().split(' '), ta.strip().split(' '), align.strip())
             print(new_align_str)
 
 if __name__ == "__main__":
