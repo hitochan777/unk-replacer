@@ -1,4 +1,6 @@
 import logging
+import itertools
+
 from collections import defaultdict
 import bisect
 
@@ -98,3 +100,44 @@ class Alignment(object):
                     break
 
         return filtered
+
+    @staticmethod
+    def get_index_mapping(l1: List[str], l2: List[str]):
+        assert ''.join(l1) == ''.join(l2)
+        assert len(l1) <= len(l2)
+        p2 = 0
+        mapping = []
+        for p1 in range(len(l1)):
+            indices = []
+            s = ""
+            while s != l1[p1]:
+                s += l2[p2]
+                indices.append(p2)
+                p2 += 1
+
+            mapping.append(indices)
+
+        assert p2 == len(l2)
+        assert len(mapping) == len(l1)
+        return mapping
+
+    @staticmethod
+    def get_adjusted_alignment(orig_src: List[str], orig_tgt: List[str],
+                               new_src: List[str], new_tgt: List[str], alignment: str) -> str:
+        if alignment.strip() == '':
+            return ''
+
+        new_links = []
+
+        assert ''.join(orig_src) == ''.join(new_src)
+        assert ''.join(orig_tgt) == ''.join(new_tgt)
+
+        map_src = Alignment.get_index_mapping(orig_src, new_src)
+        map_tgt = Alignment.get_index_mapping(orig_tgt, new_tgt)
+
+        for link_str in alignment.split(' '):
+            f_index, e_index = list(map(int, link_str.split('-')))
+            link_product = list(itertools.product(map_src[f_index], map_tgt[e_index]))
+            new_links += link_product
+
+        return ' '.join(map(lambda x: "%d-%d" % (x[0], x[1]), new_links))
