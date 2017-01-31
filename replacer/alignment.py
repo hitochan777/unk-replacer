@@ -122,8 +122,8 @@ class Alignment(object):
         return mapping
 
     @staticmethod
-    def get_adjusted_alignment(orig_src: List[str], orig_tgt :List[str],
-                               new_src: List[str], new_tgt: List[str], alignment: str):
+    def get_adjusted_alignment(orig_src: List[str], orig_tgt: List[str],
+                               new_src: List[str], new_tgt: List[str], alignment: str) -> str:
         if alignment.strip() == '':
             return ''
 
