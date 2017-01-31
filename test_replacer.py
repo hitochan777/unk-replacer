@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Replacer:
 
     def __init__(self, emb: Word2Vec, bpe: BPE, voc: Iterable[str],
-                 memory: Trie, sim_threshold: float=0.3, backoff: str="unk",
+                 memory: Trie, sim_threshold: float=0.5, backoff: str="unk",
                  too_common_threshold=5000, mem_with_unk_only=True, force_word2vec_for_one_word: bool=False,
                  handle_numbers: bool=False) -> None:
 
@@ -189,7 +189,7 @@ class Replacer:
     @classmethod
     def factory(cls, w2v_model_path: str, w2v_model_topn: str,
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
-                bpe_code_path: str=None, sim_threshold: float=0.3, emb_voc_size: int=10000,
+                bpe_code_path: str=None, sim_threshold: float=0.5, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
                 use_all_memory: bool=False, memory_min_freq: int=1,
                 force_word2vec_for_one_word: bool=False, handle_numbers: bool=False):
@@ -235,7 +235,7 @@ def main(args=None):
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
     parser.add_argument('--bpe-code', default=None, type=str, help='Path to source BPE code')
     parser.add_argument('--memory', default=None, type=str, help='Path to replacement memory')
-    parser.add_argument('--sim-threshold', default=0.6, type=float,
+    parser.add_argument('--sim-threshold', default=0.5, type=float,
                         help='Threshold value for source cosine similarity')
     parser.add_argument('--emb-vocab-size', metavar='K',
                         type=int, default=10000, help='Use top %(metavar)s most frequent in-vocab words as replacement')

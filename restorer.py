@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 class Restorer:
     def __init__(self, lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary, memory=None,
-                 prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False, lex_top_n=None):
+                 prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False, lex_top_n=None,
+                 handle_numbers: bool=False):
         self.lex_e2f = lex_e2f
         self.lex_f2e = lex_f2e
         self.memory = memory
@@ -31,6 +32,13 @@ class Restorer:
         self.nb_no_dic_entry = 0
 
         self.print_every = 100
+        
+        self.handle_numbers = handle_numbers
+
+        if self.handle_numbers:
+            logger.info('number handling is ON')
+        else:
+            logger.info('number handling is OFF')
 
     def print_statistics(self):
         print("Statistics:")
@@ -107,6 +115,10 @@ class Restorer:
             # skip BPE vocab
             if translation[eIndex].endswith(("@@", "</w>")) or (eIndex > 0 and translation[eIndex - 1].endswith(("@@", "</w>"))):
                 continue
+
+            # if self.handle_numbers:
+            #     # skip number vocab
+            #     if i
 
             prob_e2f = self.lex_e2f.get_prob(cond=translation[eIndex], word=replaced_src_word)  # type: float
             prob_f2e = self.lex_f2e.get_prob(cond=replaced_src_word, word=translation[eIndex])  # type: float
@@ -344,7 +356,7 @@ class Restorer:
 
     @classmethod
     def factory(cls, lex_e2f_path: str, lex_f2e_path: str, memory_path: str=None, lex_backoff: bool=False,
-                lex_top_n=None):
+                lex_top_n=None, handle_numbers: bool=False):
         logger.info("Loading e2f lexical dictionary from %s" % lex_e2f_path)
         lex_e2f = LexicalDictionary.read_lex_table(lex_e2f_path, topn=None)
         logger.info("Loading f2e lexical dictionary from %s" % lex_f2e_path)
@@ -361,7 +373,7 @@ class Restorer:
         else:
             memory = None
 
-        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n)
+        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n, handle_numbers=handle_numbers)
 
 
 def main(args=None):
@@ -379,6 +391,7 @@ def main(args=None):
     parser.add_argument('--attention', required=True, type=str, help='Path to attention')
     parser.add_argument('-b', '--lex-backoff', action='store_true',
                         help='Use lexical table when entry is not found in memory')
+    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
 
     options = parser.parse_args(args)
 
@@ -391,7 +404,8 @@ def main(args=None):
                                 lex_f2e_path=options.lex_f2e,
                                 memory_path=options.memory,
                                 lex_backoff=options.lex_backoff,
-                                lex_top_n=options.lex_top_n)
+                                lex_top_n=options.lex_top_n,
+                                handle_numbers=options.handle_numbers)
 
     replacer.restore_file(options.translation, options.orig_input, options.replaced_input, options.output, options.attention, options.replace_log)
 
