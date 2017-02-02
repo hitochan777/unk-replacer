@@ -6,6 +6,7 @@ from itertools import zip_longest
 import re
 
 from replacer.lexical_dictionary import LexicalDictionary
+from replacer.number_normalizer import NumberHandler, NumberRestorer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 class Restorer:
     def __init__(self, lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary, memory=None,
-                 prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False, lex_top_n=None):
+                 prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False, lex_top_n=None,
+                 handle_numbers: bool=False, number_restorer: str="hankaku"):
         self.lex_e2f = lex_e2f
         self.lex_f2e = lex_f2e
         self.memory = memory
@@ -31,6 +33,20 @@ class Restorer:
         self.nb_no_dic_entry = 0
 
         self.print_every = 100
+        
+        self.handle_numbers = handle_numbers
+
+        if self.handle_numbers:
+            logger.info('number handling is ON')
+        else:
+            logger.info('number handling is OFF')
+
+        if number_restorer == "hankaku":
+            self.number_restorer = NumberRestorer.restore_to_hankaku
+        elif number_restorer == "zenkaku":
+            self.number_restorer = NumberRestorer.restore_to_zenkaku
+        else:
+            raise RuntimeError("Invalid number restorer")
 
     def print_statistics(self):
         print("Statistics:")
@@ -108,9 +124,21 @@ class Restorer:
             if translation[eIndex].endswith(("@@", "</w>")) or (eIndex > 0 and translation[eIndex - 1].endswith(("@@", "</w>"))):
                 continue
 
-            prob_e2f = self.lex_e2f.get_prob(cond=translation[eIndex], word=replaced_src_word)  # type: float
-            prob_f2e = self.lex_f2e.get_prob(cond=replaced_src_word, word=translation[eIndex])  # type: float
-            score = (prob_e2f + prob_f2e)/2.0 * attention_prob
+            if self.handle_numbers and replaced_src_word in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]:
+                # numbers need to be aligned to be numbers
+                if translation[eIndex] not in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]:
+                     continue
+            else:
+                # if a replaced source word is not a number related token, but the target word in focus is a number related token, continue to the next iteration
+                if NumberHandler.is_number_token(translation[eIndex]) or (eIndex < len(translation) - 1 and NumberHandler.is_number_token(translation[eIndex + 1])):
+                    continue
+
+            if self.handle_numbers and NumberHandler.is_number_tag(replaced_src_word):
+                score = attention_prob
+            else:
+                prob_e2f = self.lex_e2f.get_prob(cond=translation[eIndex], word=replaced_src_word)  # type: float
+                prob_f2e = self.lex_f2e.get_prob(cond=replaced_src_word, word=translation[eIndex])  # type: float
+                score = (prob_e2f + prob_f2e)/2.0 * attention_prob
 
             if score <= 0.0:
                 continue
@@ -125,31 +153,40 @@ class Restorer:
             else:
                 is_recovered[e_index_with_max_score] = True
                 self.count_back_substitute += 1
-                if self.memory is not None:
-                    if replaced_src_word in self.memory and translation[e_index_with_max_score] in self.memory[replaced_src_word]:
-                        dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
-                        if orig_src_seq in dic:
-                            best_word = dic[orig_src_seq][0]  # choose the first one for now
+                if not (self.handle_numbers and NumberHandler.is_number_tag(replaced_src_word)):
+                    if self.memory is not None:
+                        if replaced_src_word in self.memory and translation[e_index_with_max_score] in self.memory[replaced_src_word]:
+                            dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
+                            if orig_src_seq in dic:
+                                best_word = dic[orig_src_seq][0]  # choose the first one for now
+                                recovered_translation[e_index_with_max_score] = best_word
+                                logger.info("[1:memory] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                                assert type(best_word) == str, best_word
+                                return
+
+                        logger.info("%s not found in the memory" % orig_src_seq)
+
+                    if orig_src_seq_len == 1:
+                        best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
+                        if in_dict:
+                            logger.info("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                             recovered_translation[e_index_with_max_score] = best_word
-                            logger.info("[1:memory] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
-                            assert type(best_word) == str, best_word
                             return
 
-                    logger.info("%s not found in the memory" % orig_src_seq)
-
-                if orig_src_seq_len == 1:
-                    best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
-                    if in_dict:
-                        logger.info("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
-                        recovered_translation[e_index_with_max_score] = best_word
-                        return
-
                 self.nb_no_dic_entry += 1
-                logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], orig_src_seq))
-                recovered_translation[e_index_with_max_score] = orig_src_seq
+                if self.handle_numbers and replaced_src_word in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]:
+                    best_word = self.number_restorer(orig_src_seq)
+                else:
+                    best_word = orig_src_seq
+
+                recovered_translation[e_index_with_max_score] = best_word
+                logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+
                 return
 
-        if self.memory is None:
+        if self.handle_numbers and replaced_src_word in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]:
+            pass
+        elif self.memory is None:
             candidates_replaced_src = self.lex_f2e.get_translations(cond=replaced_src_word, only_in_vocab=False,
                                                                     prob_threshold=self.prob_threshold)
         else:
@@ -166,12 +203,69 @@ class Restorer:
                 logger.info("%s not in the replacement memory." % replaced_src_word)
                 candidates_replaced_src = []
 
-        for word, prob in candidates_replaced_src:
-            assert prob >= self.prob_threshold
+        if not (self.handle_numbers and replaced_src_word in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]):
+            for word, prob in candidates_replaced_src:
+                assert prob >= self.prob_threshold
+                indices = [
+                    index for index, translation_word in enumerate(recovered_translation)
+                    if translation_word == word and not is_recovered[index]
+                    ]
+                if len(indices) > 0:
+                    if len(indices) > 1:
+                        logger.warning("There are %d target words I can replace!!!"
+                                       " For now I simply choose the first non-recovered one." % (len(indices),))
+
+                    for index in indices:
+                        if not is_recovered[index]:
+                            best_index = indices[0]
+                            break
+                    else:
+                        logger.warning("There were no non-recovered target indices for %s! Using next candidate..." % (word,))
+                        continue
+
+                    if self.memory is None:
+                        assert orig_src_seq_len == 1
+                        best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
+                        if in_dict:
+                            logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
+                            recovered_translation[best_index] = best_word
+                            is_recovered[best_index] = True
+                            self.count_back_substitute += 1
+                            return
+                    else:
+                        if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
+                            dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
+                            if orig_src_seq in dic:
+                                best_word = dic[orig_src_seq][0]  # For now use the first one
+                                assert isinstance(best_word, str), best_word
+                                recovered_translation[best_index] = best_word
+                                is_recovered[best_index] = True
+                                self.count_back_substitute += 1
+                                logger.info("[2:memory] %s ➔ %s" % (translation[best_index], best_word))
+                                return
+
+                        if self.lex_backoff and orig_src_seq_len == 1:
+                            best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
+                            if in_dict:
+                                recovered_translation[best_index] = best_word
+                                is_recovered[best_index] = True
+                                self.count_back_substitute += 1
+                                logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
+                                return
+
+                    self.nb_no_dic_entry += 1
+                    logger.info("[2:copy] %s ➔ %s" % (translation[best_index], orig_src_seq))
+                    recovered_translation[best_index] = orig_src_seq
+                    is_recovered[best_index] = True
+                    self.count_back_substitute += 1
+                    return
+            else:
+                logger.info("Not replaced")
+        else:
             indices = [
-                index for index, translation_word in enumerate(recovered_translation)
-                if translation_word == word and not is_recovered[index]
-                ]
+                index for index, word in enumerate(recovered_translation)
+                if word == replaced_src_word and not is_recovered[index]
+            ]
             if len(indices) > 0:
                 if len(indices) > 1:
                     logger.warning("There are %d target words I can replace!!!"
@@ -182,47 +276,18 @@ class Restorer:
                         best_index = indices[0]
                         break
                 else:
-                    logger.warning("There were no non-recovered target indices for %s! Using next candidate..." % (word,))
-                    continue
-
-                if self.memory is None:
-                    assert orig_src_seq_len == 1
-                    best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
-                    if in_dict:
-                        logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
-                        recovered_translation[best_index] = best_word
-                        is_recovered[best_index] = True
-                        self.count_back_substitute += 1
-                        return
-                else:
-                    if replaced_src_word in self.memory and translation[eIndex] in self.memory[replaced_src_word]:
-                        dic = self.memory[replaced_src_word][translation[e_index_with_max_score]]
-                        if orig_src_seq in dic:
-                            best_word = dic[orig_src_seq][0]  # For now use the first one
-                            assert isinstance(best_word, str), best_word
-                            recovered_translation[best_index] = best_word
-                            is_recovered[best_index] = True
-                            self.count_back_substitute += 1
-                            logger.info("[2:memory] %s ➔ %s" % (translation[best_index], best_word))
-                            return
-
-                    if self.lex_backoff and orig_src_seq_len == 1:
-                        best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
-                        if in_dict:
-                            recovered_translation[best_index] = best_word
-                            is_recovered[best_index] = True
-                            self.count_back_substitute += 1
-                            logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
-                            return
+                    logger.warning("There were no non-recovered target indices for %s!  Not replacing..." % (word,))
+                    return
 
                 self.nb_no_dic_entry += 1
-                logger.info("[2:copy] %s ➔ %s" % (translation[best_index], orig_src_seq))
+                logger.info("[2:copy] %s ➔ %s" % (translation[best_index], self.number_restorer(orig_src_seq)))
                 recovered_translation[best_index] = orig_src_seq
                 is_recovered[best_index] = True
                 self.count_back_substitute += 1
                 return
-        else:
-            logger.info("Not replaced")
+            else:
+                logger.info("Not replaced")
+                return
 
         return
 
@@ -264,6 +329,9 @@ class Restorer:
                 logger.info("Skipping <@UNK>")
                 continue
 
+            if self.handle_numbers and replaced_src[f_index] in ["<@num:%d>" % i for i in range(13)]:
+                continue
+
             self.count_changed_src += 1
 
             self.process_one_replaced_word(orig_src_seq=orig_src_seq, replaced_src_word=replaced_src[f_index],
@@ -272,7 +340,16 @@ class Restorer:
                                            recovered_translation=recovered_translation, f_index=f_index)
 
         recovered_translation = self.restore_bpe(list(filter(None, recovered_translation)))
-        recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src) ,log)
+        recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src), log)
+        if self.handle_numbers:
+            recovered_translation = NumberHandler.restore(recovered_translation)
+            for index, token in enumerate(recovered_translation):
+                if token in ["<@num:%d>" % i for i in range(13)]:
+                    m = re.search(r'^<@num:(?P<num>\d+)>$', token)
+                    assert m is not None
+                    num = m.group("num")
+                    recovered_translation[index] = self.number_restorer(num)
+
         return ' '.join(recovered_translation)
 
     def replace_unk_symbols(self, orig_src: List[str], translation: List[str], replaced_src_len: int, log) -> List[str]:
@@ -309,7 +386,12 @@ class Restorer:
                 continue
 
             f_index = int(m.group("f_index"))
-            assert f_index in orig_idx_dic, (f_index, orig_idx_dic, log)
+            if self.handle_numbers:
+                if f_index not in orig_idx_dic:
+                    logger.info("Not restoring because %s (%d-th word) is aligned to a number token" % (translation[index], index))
+                    continue
+            else:
+                assert f_index in orig_idx_dic, (f_index, orig_idx_dic, log)
 
             orig_idx = orig_idx_dic[f_index]
             orig_word = orig_src[orig_idx]
@@ -344,7 +426,7 @@ class Restorer:
 
     @classmethod
     def factory(cls, lex_e2f_path: str, lex_f2e_path: str, memory_path: str=None, lex_backoff: bool=False,
-                lex_top_n=None):
+                lex_top_n=None, handle_numbers: bool=False, number_restorer: str="hankaku"):
         logger.info("Loading e2f lexical dictionary from %s" % lex_e2f_path)
         lex_e2f = LexicalDictionary.read_lex_table(lex_e2f_path, topn=None)
         logger.info("Loading f2e lexical dictionary from %s" % lex_f2e_path)
@@ -361,7 +443,7 @@ class Restorer:
         else:
             memory = None
 
-        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n)
+        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n, handle_numbers=handle_numbers, number_restorer=number_restorer)
 
 
 def main(args=None):
@@ -379,6 +461,8 @@ def main(args=None):
     parser.add_argument('--attention', required=True, type=str, help='Path to attention')
     parser.add_argument('-b', '--lex-backoff', action='store_true',
                         help='Use lexical table when entry is not found in memory')
+    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
+    parser.add_argument('--number-restorer', default="hankaku", choices=["zenkaku", "hankaku"], help='Restorer for numbers')
 
     options = parser.parse_args(args)
 
@@ -391,7 +475,9 @@ def main(args=None):
                                 lex_f2e_path=options.lex_f2e,
                                 memory_path=options.memory,
                                 lex_backoff=options.lex_backoff,
-                                lex_top_n=options.lex_top_n)
+                                lex_top_n=options.lex_top_n,
+                                handle_numbers=options.handle_numbers,
+                                number_restorer=options.number_restorer)
 
     replacer.restore_file(options.translation, options.orig_input, options.replaced_input, options.output, options.attention, options.replace_log)
 

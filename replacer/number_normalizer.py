@@ -1,8 +1,32 @@
 import mojimoji
 import argparse
+import re
+
+
+class NumberRestorer:
+
+    @staticmethod
+    def restore_to_zenkaku(number: str) -> str:
+        return mojimoji.han_to_zen(str(number))
+
+    @staticmethod
+    def restore_to_hankaku(number: str) -> str:
+        return mojimoji.zen_to_han(number)
 
 
 class NumberHandler:
+
+    @classmethod
+    def is_number_tag(cls, word):
+        return re.search(r'^<@num:.+>$', word) is not None
+
+    @classmethod
+    def is_number_token(cls, word):
+        """
+        Returns true if word is a number token.
+        This method is inprecise in a sense that it does not return True when the word is the start of the subword. But for the current purpose (to use in restorer.py), this criteria is sufficient.
+        """
+        return word.startswith('_') or re.search(r'^<@num:.+>$', word) is not None
 
     @classmethod
     def process_number(cls, string: str, split_prefix='_'):
@@ -39,7 +63,7 @@ class NumberHandler:
         return split
 
     @classmethod
-    def restore(cls, allow_invalid_seq=True, split_prefix='_'):
+    def restore(cls, tokens, allow_invalid_seq=True, split_prefix='_'):
         assert isinstance(tokens, list)
         restored = []
         for token in tokens:
