@@ -63,7 +63,7 @@ class BleuComputer(object):
             for start in range(0, len(translation) - n + 1):
                 ngram = tuple(translation[start: start + n])
                 translation_ngrams[ngram] += 1
-            for ngram, translation_freq in translation_ngrams.iteritems():
+            for ngram, translation_freq in translation_ngrams.items():
                 reference_freq = reference_ngrams[ngram]
                 self.ngrams_total[n] += translation_freq
                 if ngram in reference_ngrams:
@@ -77,10 +77,10 @@ class BleuComputer(object):
         ref_file = open(ref_fn)
         trans_file = open(trans_fn)
         bc = BleuComputer()
-        for line_ref, line_trans, log in zip_longest(ref_file, trans_file, replace_log_file):
+        for line_ref, line_trans in zip_longest(ref_file, trans_file):
             r = line_ref.strip().split(" ")
             t = line_trans.strip().split(" ")
-            bc.update(r, t, log)
+            bc.update(r, t)
 
         return bc
 
