@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class Restorer:
     def __init__(self, lex_e2f: LexicalDictionary, lex_f2e: LexicalDictionary, memory=None,
                  prob_threshold=0.1, attention_threshold=0.1, lex_backoff: bool=False, lex_top_n=None,
-                 handle_numbers: bool=False, number_restorer: str="hankaku"):
+                 handle_numbers: bool=False, number_restorer: str="hankaku", no_unk_rep: bool=False):
         self.lex_e2f = lex_e2f
         self.lex_f2e = lex_f2e
         self.memory = memory
@@ -47,6 +47,10 @@ class Restorer:
             self.number_restorer = NumberRestorer.restore_to_zenkaku
         else:
             raise RuntimeError("Invalid number restorer")
+
+        self.no_unk_rep = no_unk_rep
+        if self.no_unk_rep:
+            logger.info("Not replacing UNK symbols")
 
     def print_statistics(self):
         print("Statistics:")
@@ -340,7 +344,9 @@ class Restorer:
                                            recovered_translation=recovered_translation, f_index=f_index)
 
         recovered_translation = self.restore_bpe(list(filter(None, recovered_translation)))
-        recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src), log)
+        if not self.no_unk_rep:
+            recovered_translation = self.replace_unk_symbols(orig_src, recovered_translation, len(replaced_src), log)
+
         if self.handle_numbers:
             recovered_translation = NumberHandler.restore(recovered_translation)
             for index, token in enumerate(recovered_translation):
@@ -428,7 +434,7 @@ class Restorer:
 
     @classmethod
     def factory(cls, lex_e2f_path: str, lex_f2e_path: str, memory_path: str=None, lex_backoff: bool=False,
-                lex_top_n=None, handle_numbers: bool=False, number_restorer: str="hankaku"):
+                lex_top_n=None, handle_numbers: bool=False, number_restorer: str="hankaku", no_unk_rep: bool=False):
         logger.info("Loading e2f lexical dictionary from %s" % lex_e2f_path)
         lex_e2f = LexicalDictionary.read_lex_table(lex_e2f_path, topn=None)
         logger.info("Loading f2e lexical dictionary from %s" % lex_f2e_path)
@@ -445,7 +451,7 @@ class Restorer:
         else:
             memory = None
 
-        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n, handle_numbers=handle_numbers, number_restorer=number_restorer)
+        return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n, handle_numbers=handle_numbers, number_restorer=number_restorer, no_unk_rep=no_unk_rep)
 
 
 def main(args=None):
@@ -465,6 +471,7 @@ def main(args=None):
                         help='Use lexical table when entry is not found in memory')
     parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
     parser.add_argument('--number-restorer', default="hankaku", choices=["zenkaku", "hankaku"], help='Restorer for numbers')
+    parser.add_argument('--no-unk-rep', action='store_true', help='If set, do not replace UNK symbols in the translations')
 
     options = parser.parse_args(args)
 
@@ -479,7 +486,8 @@ def main(args=None):
                                 lex_backoff=options.lex_backoff,
                                 lex_top_n=options.lex_top_n,
                                 handle_numbers=options.handle_numbers,
-                                number_restorer=options.number_restorer)
+                                number_restorer=options.number_restorer,
+                                no_unk_rep=options.no_unk_rep)
 
     replacer.restore_file(options.translation, options.orig_input, options.replaced_input, options.output, options.attention, options.replace_log)
 
