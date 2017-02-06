@@ -281,7 +281,7 @@ class Restorer:
 
                 self.nb_no_dic_entry += 1
                 logger.info("[2:copy] %s ➔ %s" % (translation[best_index], self.number_restorer(orig_src_seq)))
-                recovered_translation[best_index] = orig_src_seq
+                recovered_translation[best_index] = self.number_restorer(orig_src_seq)
                 is_recovered[best_index] = True
                 self.count_back_substitute += 1
                 return
@@ -391,7 +391,9 @@ class Restorer:
                     logger.info("Not restoring because %s (%d-th word) is aligned to a number token" % (translation[index], index))
                     continue
             else:
-                assert f_index in orig_idx_dic, (f_index, orig_idx_dic, log)
+                if f_index not in orig_idx_dic:
+                    # a replaced word is translated to multiple UNK symbols, I believe there is no difference between recovering the multiple UNK symbols or leave them as they are.
+                    continue
 
             orig_idx = orig_idx_dic[f_index]
             orig_word = orig_src[orig_idx]
