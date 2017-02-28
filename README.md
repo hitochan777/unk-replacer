@@ -18,9 +18,9 @@ make test (Optional)
 
 1. Build source and target vocabulary from the training data with the following command
 
-```bash
+    ```bash
     python build_vocab.py :TODO
-```
+    ```
 
 2. Get word alignment for the parallel corpora and lexical translation tables for both direction.
    
@@ -36,60 +36,59 @@ make test (Optional)
    For example, you can use `gensim` module to train a word2vec model from `TRAIN`
    and save it to `MODEL_NAME`.
  
-```bash
-    python -m gensim.models.word2vec \
-       -train TRAIN \
-       -output MODEL_NAME
-```
+   ```bash
+   python -m gensim.models.word2vec \
+   -train TRAIN \
+   -output MODEL_NAME
+   ```
    
    There are many parameters you can change.
    For more information, type
    
-```bash
+    ```bash
    python -m gensim.models.word2vec -h
-```
+    ```
 
 3. Replace unknown words in the training data with the
     following command.
    
-```bash
-python /home/otsuki/developer/replacer/bin/train_replacer.py \
-    --root-dir /path/to/save/artifacts \
-    --src-w2v-model /path/to/source/word2vec/model \
-    --tgt-w2v-model /path/to/target/word2vec/model \
-    --lex-e2f /path/to/target/to/source/lex/dict \
-    --lex-f2e /path/to/source/to/target/lex/dict \
-    --train-src /path/to/source/training/data \
-    --train-tgt /path/to/target/training/data \
-    --train-align /path/to/word/alignment/for/training/data \
-    --vocab /path/to/json/vocab/file \
-    --memory /path/to/save/replacement/memory \
-    --replace-type multi
-```
+    ```bash
+    python /home/otsuki/developer/replacer/bin/train_replacer.py \
+        --root-dir /path/to/save/artifacts \
+        --src-w2v-model /path/to/source/word2vec/model \
+        --tgt-w2v-model /path/to/target/word2vec/model \
+        --lex-e2f /path/to/target/to/source/lex/dict \
+        --lex-f2e /path/to/source/to/target/lex/dict \
+        --train-src /path/to/source/training/data \
+        --train-tgt /path/to/target/training/data \
+        --train-align /path/to/word/alignment/for/training/data \
+        --vocab /path/to/json/vocab/file \
+        --memory /path/to/save/replacement/memory \
+        --replace-type multi
+    ```
 
-If you also want to replace unknown words in **development data**,
-you can specify the paths to the source development data (`--dev-src`), target development data (`--dev-tgt`), 
-word alignment (`--dev-align`).
+    If you also want to replace unknown words in **development data**,
+    you can specify the paths to the source development data (`--dev-src`), target development data (`--dev-tgt`), 
+    word alignment (`--dev-align`).
 
 4. Train NMT model with the replaced training data from step 3
 
 5. Replace unknown words in the test data with the following command.
 
-```bash
+    ```bash
     python test_replacer.py TODO:
-```
+    ```
 
 6. Translate the replaced test data with the trained NMT model.
 
-We recommend that you ensemble several models because it normally
-leads to the better attention.
+    We recommend that you ensemble several models because it normally
+    leads to the better attention.
 
 7. Restore the final translation with the following command.
 
-```bash
+    ```bash
     python restorer.py
-```
-
+    ```
 
 ## Advanced Usage
 
