@@ -14,12 +14,6 @@ make install
 make test (Optional)
 ```
 
-## What you need in the experiment
-
-- training data
-- (optional) development data
-- test data
-
 ## Basic Usage
 
 1. Build source and target vocabulary from the training data with the following command
@@ -59,7 +53,18 @@ make test (Optional)
     following command.
    
 ```bash
-    python train_replacer.py TODO:
+python /home/otsuki/developer/replacer/bin/train_replacer.py \
+    --root-dir /path/to/save/artifacts \
+    --src-w2v-model /path/to/source/word2vec/model \
+    --tgt-w2v-model /path/to/target/word2vec/model \
+    --lex-e2f /path/to/target/to/source/lex/dict \
+    --lex-f2e /path/to/source/to/target/lex/dict \
+    --train-src /path/to/source/training/data \
+    --train-tgt /path/to/target/training/data \
+    --train-align /path/to/word/alignment/for/training/data \
+    --vocab /path/to/json/vocab/file \
+    --memory /path/to/save/replacement/memory \
+    --replace-type multi
 ```
 
 If you also want to replace unknown words in **development data**,
@@ -84,3 +89,8 @@ leads to the better attention.
 ```bash
     python restorer.py
 ```
+
+
+## Advanced Usage
+
+### Hybridization of word and BPE based method
