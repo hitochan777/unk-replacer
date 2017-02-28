@@ -1,7 +1,7 @@
 from typing import Iterable, List, Tuple, Any
 import argparse
 import json
-from os import path
+import os
 import logging
 
 from replacer.bpe.apply_bpe import BPE
@@ -157,10 +157,13 @@ class Replacer:
         logger.debug(replace_log)
         return ' '.join(filter(None, new_seq)), replace_log
 
-    def replace_file(self, input_file, suffix, replace_log):
-        output_file = input_file + suffix
+    def replace_file(self, input_file, suffix, replace_log, root_dir):
+        if not os.path.exists(root_dir):
+            os.makedirs(root_dir)
+
+        output_file = os.path.join(root_dir, os.path.basename(input_file) + suffix)
         logs = []
-        if path.isfile(output_file):
+        if os.path.isfile(output_file):
             input("%s will be overwritten. Press Enter to continue" % output_file)
 
         with open(input_file, 'r') as lines, open(output_file, 'w') as out:
@@ -249,6 +252,7 @@ def main(args=None):
     parser.add_argument('--memory-min-freq', type=int, default=1, help='Minumum frequency threshold for the replacement memory. Default: %(default)s')
     parser.add_argument('--force-word2vec-for-one-word', action='store_true', help='If set, word2vec is used for one word even if replacement memory exits')
     parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
+    parser.add_argument('-r', '--root-dir', required=True, help='Path to save artifacts')
 
     options = parser.parse_args(args)
 

@@ -7,7 +7,7 @@ import logging
 import sys
 import textwrap
 
-from os import path
+import os
 import json
 from typing import Dict, List, Iterable, Union, Tuple
 
@@ -68,7 +68,7 @@ class Replacer:
         self.allow_unk_character = allow_unk_character
 
     def export_memory(self, output: str) -> None:
-        if path.isfile(output):
+        if os.path.isfile(output):
             input("%s will be overwritten. Press Enter to proceed." % (output,))
 
         logger.info("Writing replacement of size %d to %s... Wait patiently..." % (len(self.memory), output))
@@ -371,14 +371,18 @@ class Replacer:
 
         return False, (None, None)
 
-    def replace_parallel_corpus(self, src_file: str, tgt_file: str, align_file: str, suffix: str, print_per_lines: int=10000, first_n_lines: int=None):
-        new_src_filename = src_file + suffix
-        new_tgt_filename = tgt_file + suffix
+    def replace_parallel_corpus(self, src_file: str, tgt_file: str, align_file: str, suffix: str, root_dir: str, print_per_lines: int=10000, first_n_lines: int=None):
+
+        if not os.path.exists(root_dir):
+            os.makedirs(root_dir)
+
+        new_src_filename = os.path.join(root_dir, os.path.basename(src_file) + suffix)
+        new_tgt_filename = os.path.join(root_dir, os.path.basename(tgt_file) + suffix)
         existing_files = []
-        if path.isfile(new_src_filename):
+        if os.path.exists(new_src_filename):
             existing_files.append(new_src_filename)
 
-        if path.isfile(new_tgt_filename):
+        if os.path.exists(new_tgt_filename):
             existing_files.append(new_tgt_filename)
 
         if len(existing_files) > 0:
@@ -518,7 +522,8 @@ def main(args=None):
                         1-to-1: Replace unknown words in 1-to-1 links only
                         multi: Replace unknown words in 1-to-1, 1-to-many, many-to-1
                         '''))
-    parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, ')
+    parser.add_argument('-n', '--handle-numbers', action='store_true')
+    parser.add_argument('-r', '--root-dir', required=True, help='Path to save artifacts')
     # TODO: add src-sim, tgt-sim, prob, threshold
     # TODO: add embedding vocab option
 
@@ -543,12 +548,12 @@ def main(args=None):
     if options.train_src is not None and options.train_tgt is not None and options.train_align is not None:
         logger.info("Processing training data")
         replacer.set_allow_unk_character(False)
-        replacer.replace_parallel_corpus(options.train_src, options.train_tgt, options.train_align, options.replaced_suffix, print_per_lines=10000, first_n_lines=options.train_first_n_lines)
+        replacer.replace_parallel_corpus(options.train_src, options.train_tgt, options.train_align, options.replaced_suffix, options.root_dir, print_per_lines=10000, first_n_lines=options.train_first_n_lines)
 
     if options.dev_src is not None and options.dev_tgt is not None and options.dev_align is not None:
         logger.info("Processing dev data")
         replacer.set_allow_unk_character(True)
-        replacer.replace_parallel_corpus(options.dev_src, options.dev_tgt, options.dev_align, options.replaced_suffix, print_per_lines=100)
+        replacer.replace_parallel_corpus(options.dev_src, options.dev_tgt, options.dev_align, options.replaced_suffix, options.root_dir, print_per_lines=100)
 
     if options.memory is not None:
         logger.info("Finally writing replacement memory")
