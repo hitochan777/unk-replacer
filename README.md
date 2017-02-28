@@ -68,8 +68,8 @@ python /home/otsuki/developer/replacer/bin/train_replacer.py \
 ```
 
 If you also want to replace unknown words in **development data**,
-you can specify the paths to the source development data, target development data, 
-word alignment.
+you can specify the paths to the source development data (`--dev-src`), target development data (`--dev-tgt`), 
+word alignment (`--dev-align`).
 
 4. Train NMT model with the replaced training data from step 3
 
