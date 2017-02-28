@@ -37,24 +37,36 @@ make test (Optional)
    which is a supervised alignment model rather than GIZA++, 
    because it produces much better alignment.
 
-2. Train source and target Word2vec models with the following command
+2. Train source and target Word2vec models
+   
+   For example, you can use `gensim` module to train a word2vec model from `TRAIN`
+   and save it to `MODEL_NAME`.
  
 ```bash
-    python train_word2vec.py :TODO
+    python -m gensim.models.word2vec \
+       -train TRAIN \
+       -output MODEL_NAME
+```
+   
+   There are many parameters you can change.
+   For more information, type
+   
+```bash
+   python -m gensim.models.word2vec -h
 ```
 
-3. Replace unknown words in the training and development data with the
+3. Replace unknown words in the training data with the
     following command.
    
 ```bash
     python train_replacer.py TODO:
 ```
 
-4. Train NMT model with the replaced training data from step 3
+If you also want to replace unknown words in **development data**,
+you can specify the paths to the source development data, target development data, 
+word alignment.
 
-```bash
-    TODO
-```
+4. Train NMT model with the replaced training data from step 3
 
 5. Replace unknown words in the test data with the following command.
 
@@ -72,7 +84,3 @@ leads to the better attention.
 ```bash
     python restorer.py
 ```
-
-## End-to-End Experiment with Sacred
-
-TBW
