@@ -53,7 +53,7 @@ make test (Optional)
     following command.
    
     ```bash
-    python /home/otsuki/developer/replacer/bin/train_replacer.py \
+    python bin/train_replacer.py \
         --root-dir /path/to/save/artifacts \
         --src-w2v-model /path/to/source/word2vec/model \
         --tgt-w2v-model /path/to/target/word2vec/model \
@@ -76,7 +76,12 @@ make test (Optional)
 5. Replace unknown words in the test data with the following command.
 
     ```bash
-    python test_replacer.py TODO:
+    python bin/test_replacer.py \
+        --root-dir /path/to/save/artifacts \
+        --w2v-model /path/to/source/word2vec/model \
+        --input /path/to/input/data \
+        --vocab /path/to/json/vocab/file \
+        --replace-log /path/to/save/replace/log/file
     ```
 
 6. Translate the replaced test data with the trained NMT model.
@@ -87,7 +92,16 @@ make test (Optional)
 7. Restore the final translation with the following command.
 
     ```bash
-    python restorer.py
+    python bin/restorer.py \
+        --translation /path/to/translation \
+        --orig-input /path/to/original/input \
+        --replaced-input /path/to/replaced/input \
+        --output /path/to/save/final/translation \
+        --lex-e2f /path/to/target/to/source/lex/dict \
+        --lex-f2e /path/to/source/to/target/lex/dict \
+        --replace-log /path/to/replace/log \
+        --attention /path/to/attention \
+        --lex-backoff
     ```
 
 ## Advanced Usage
