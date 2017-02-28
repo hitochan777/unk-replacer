@@ -508,7 +508,7 @@ def main(args=None):
     parser.add_argument('--dev-tgt', default=None, type=str, help='Path to target dev data')
     parser.add_argument('--train-align', required=True, type=str, default=None, help='Path to word alignment file for training data')
     parser.add_argument('--dev-align', required=True, type=str, default=None, help='Path to word alignment file for dev data')
-    parser.add_argument('--replaced-suffix', required=True, type=str,
+    parser.add_argument('--replaced-suffix', default='', type=str,
                         help='Suffix for newly created training and dev data')
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
     parser.add_argument('--src-bpe-code', default=None, type=str, help='Path to source BPE code')

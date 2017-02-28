@@ -231,7 +231,7 @@ def main(args=None):
     parser.add_argument('--w2v-model-topn', metavar='K', default=10, type=int,
                         help='Use top %(metavar)s most similar words from source word2vec')
     parser.add_argument('--input', required=True, type=str, help='Path to input file to replace')
-    parser.add_argument('--replaced-suffix', required=True, type=str,
+    parser.add_argument('--replaced-suffix', default='', type=str,
                         help='Suffix for newly created training and dev data')
     parser.add_argument('--w2v-lowercase',
                         action='store_true', help='Lowercase word before querying word2vec')
