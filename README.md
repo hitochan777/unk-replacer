@@ -19,7 +19,13 @@ make test (Optional)
 1. Build source and target vocabulary from the training data with the following command
 
     ```bash
-    python build_vocab.py :TODO
+    python build_vocab.py \
+        word \
+        --source-file /path/to/source/training/data \
+        --target-file /path/to/target/training/data \
+        --src-vocab-size 50000 \
+        --tgt-vocab-size 50000 \
+        --output-file /path/to/json/vocab/file
     ```
 
 2. Get word alignment for the parallel corpora and lexical translation tables for both direction.
@@ -70,6 +76,8 @@ make test (Optional)
     If you also want to replace unknown words in **development data**,
     you can specify the paths to the source development data (`--dev-src`), target development data (`--dev-tgt`), 
     word alignment (`--dev-align`).
+    
+    If you want to replace unknown words in one-to-one alignment only, you can set `--replace-type` to `1-to-1`.
 
 4. Train NMT model with the replaced training data from step 3
 
@@ -103,7 +111,3 @@ make test (Optional)
         --attention /path/to/attention \
         --lex-backoff
     ```
-
-## Advanced Usage
-
-### Hybridization of word and BPE based method
