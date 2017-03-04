@@ -5,13 +5,22 @@ Unknown word replacer in Neural Machine Translation (NMT)
 [![wercker status](https://app.wercker.com/status/f85bf4841c6422cd5ddfba7bdf635318/s/ "wercker status")](https://app.wercker.com/project/byKey/f85bf4841c6422cd5ddfba7bdf635318)
 
 ## Requirements
-- Python >=3.5
+- Python >=3.3
 
 ## Install
+Currently unk-replacer is not registered PyPI, so you need to
+get it from github.
 
 ```
-make install
-make test (Optional)
+pip install git+https://github.com/hitochan777/unk-replacer.git
+```
+
+If you plan on modifying the code, it is better to do a "editable" installation:
+
+```
+git clone https://github.com/hitochan777/unk-replacer.git
+cd unk-replacer
+pip install -e .
 ```
 
 ## Basic Usage
@@ -19,7 +28,7 @@ make test (Optional)
 1. Build source and target vocabulary from the training data with the following command
 
     ```bash
-    python build_vocab.py \
+    unk-rep build_vocab \
         word \
         --source-file /path/to/source/training/data \
         --target-file /path/to/target/training/data \
@@ -51,15 +60,15 @@ make test (Optional)
    There are many parameters you can change.
    For more information, type
    
-    ```bash
+   ```bash
    python -m gensim.models.word2vec -h
-    ```
+   ```
 
 3. Replace unknown words in the training data with the
     following command.
    
     ```bash
-    python bin/train_replacer.py \
+    unk-rep replace-parallel \
         --root-dir /path/to/save/artifacts \
         --src-w2v-model /path/to/source/word2vec/model \
         --tgt-w2v-model /path/to/target/word2vec/model \
@@ -84,7 +93,7 @@ make test (Optional)
 5. Replace unknown words in the test data with the following command.
 
     ```bash
-    python bin/test_replacer.py \
+    unk-rep replace-input \
         --root-dir /path/to/save/artifacts \
         --w2v-model /path/to/source/word2vec/model \
         --input /path/to/input/data \
@@ -100,7 +109,7 @@ make test (Optional)
 7. Restore the final translation with the following command.
 
     ```bash
-    python bin/restorer.py \
+    unk-rep restore \
         --translation /path/to/translation \
         --orig-input /path/to/original/input \
         --replaced-input /path/to/replaced/input \

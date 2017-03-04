@@ -3,12 +3,14 @@ import io
 import os
 import re
 
+
 def read(*names, **kwargs):
     with io.open(
         os.path.join(os.path.dirname(__file__), *names),
         encoding=kwargs.get("encoding", "utf8")
     ) as fp:
         return fp.read()
+
 
 def find_version(*file_paths):
     version_file = read(*file_paths)
@@ -29,5 +31,6 @@ setup(
     license='MIT',
     packages=['unk_replacer'],
     scripts=['bin/unk-rep'],
-    install_requires=['gensim', 'mojimoji', 'dotmap', 'mypy-lang']
+    install_requires=['gensim', 'mojimoji', 'dotmap', 'mypy-lang'],
+    test_suite='tests'
 )
