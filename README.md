@@ -23,6 +23,23 @@ cd unk-replacer
 pip install -e .
 ```
 
+## Overview Usage
+
+After installing `unk-replacer`, a script `unk-rep` should be
+available globally.
+
+This script has several sub-commands, which can be listed on the command line with the following command:
+ 
+```bash
+unk-rep -h
+```
+
+You can further get the help for a sub-command (ex: `replace-parallel`) as follows.
+
+```bash
+unk-rep replace-parallel -h
+```
+
 ## Basic Usage
 
 1. Build source and target vocabulary from the training data with the following command
@@ -120,3 +137,5 @@ pip install -e .
         --attention /path/to/attention \
         --lex-backoff
     ```
+    
+## Advanced Usage
