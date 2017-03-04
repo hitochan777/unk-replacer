@@ -1,5 +1,5 @@
 from unittest import TestCase
-from replacer.number_normalizer import NumberHandler
+from unk_replacer.number_normalizer import NumberHandler
 
 
 class TestNumberHandler(TestCase):

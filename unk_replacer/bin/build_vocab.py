@@ -7,8 +7,8 @@ import logging
 import sys
 from typing import List, Tuple
 
-from replacer.bpe import learn_bpe
-from replacer.number_normalizer import NumberHandler
+from unk_replacer.bpe import learn_bpe
+from unk_replacer.number_normalizer import NumberHandler
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,10 @@ def build_bpe_vocab(fn, voc_limit: int, max_nb_ex: int=None) -> List[Tuple]:
         return rules
 
 
-def main(args=None):
-    parser = argparse.ArgumentParser(description='Build vocabulary')
+def define_parser(parser):
     subparsers = parser.add_subparsers(dest='sub_command', help='sub-command help')
-    parser_word = subparsers.add_parser('word', help='word help')
+    subparsers.required = True
+    parser_word = subparsers.add_parser('word', help='Build word vocabulary')
     parser_word.add_argument('--source-file', required=True, type=str, help='Training file for source language')
     parser_word.add_argument('--target-file', required=True, type=str, help='Training file for target language')
     parser_word.add_argument('--src-vocab-size', default=30000, type=int, help='Source vocabulary size')
@@ -66,7 +66,7 @@ def main(args=None):
     parser_word.add_argument('--output-file', required=True, type=str, help='Output filename')
     parser_word.add_argument('-n', '--handle-number', action='store_true', help='Special handling of numbers')
 
-    parser_bpe = subparsers.add_parser('bpe', help='bpe help')
+    parser_bpe = subparsers.add_parser('bpe', help='Build BPE vocabulary')
     parser_bpe.add_argument('--source-file', required=True, type=str, help='Training file for source language')
     parser_bpe.add_argument('--target-file', required=True, type=str, help='Training file for target language')
     parser_bpe.add_argument('--src-vocab-size', default=20000, type=int, help='Source vocabulary size')
@@ -74,8 +74,8 @@ def main(args=None):
     parser_bpe.add_argument('--max-nb-ex', default=None, type=int, help='Max number of lines to build vocabulary')
     parser_bpe.add_argument('--output-file', required=True, type=str, help='Output filename')
 
-    options = parser.parse_args(args)
 
+def run(options=None):
     if options.sub_command == "word":
         src_voc = build_word_vocab(options.source_file, voc_limit=options.src_vocab_size, max_nb_ex=options.max_nb_ex,
                                    handle_number=options.handle_number)
@@ -84,9 +84,6 @@ def main(args=None):
     elif options.sub_command == "bpe":
         src_voc = build_bpe_vocab(options.source_file, voc_limit=options.src_vocab_size, max_nb_ex=options.max_nb_ex)
         tgt_voc = build_bpe_vocab(options.target_file, voc_limit=options.tgt_vocab_size, max_nb_ex=options.max_nb_ex)
-    else:
-        parser.print_help()
-        sys.exit()
 
     logger.info("Writing vocabulary to %s in JSON format" % (options.output_file,))
     with open(options.output_file, 'w') as f:
@@ -94,6 +91,14 @@ def main(args=None):
 
     logger.info("Finished writing")
 
+
+def command_line(args=None):
+    parser = argparse.ArgumentParser(description='Build vocabulary from a parallel corpus', formatter_class=argparse.RawTextHelpFormatter)
+    define_parser(parser)
+    options = parser.parse_args(args)
+    run(options)
+
+
 if __name__ == '__main__':
-    main()
+    command_line()
 

@@ -1,6 +1,6 @@
 import argparse
 
-from replacer.alignment import Alignment
+from unk_replacer.alignment import Alignment
 
 
 def main(args=None):

@@ -3,16 +3,15 @@ import json
 from os import path
 
 
-def main(args=None):
-    parser = argparse.ArgumentParser(description='Combine BPE and word vocab')
+def define_parser(parser):
     parser.add_argument('--bpe-src-voc', required=True, type=str, help='Path to source BPE vocab file')
     parser.add_argument('--bpe-tgt-voc', required=True, type=str, help='Path to target BPE vocab file')
     parser.add_argument('--word-voc', required=True, type=str, help='Path to word vocab file in json format')
     parser.add_argument('--output', required=True, type=str, help="Path to output vocab file")
     parser.add_argument('--separator', default="@@", type=str, help="Separator for BPE")
 
-    options = parser.parse_args(args)
 
+def run(options):
     if path.isfile(options.output):
         input("%s will be overwritten. Press Enter to proceed" % (options.output, ))
 
@@ -41,5 +40,13 @@ def main(args=None):
         final_vocab = [bpe_src_voc + word_voc[0], bpe_tgt_voc + word_voc[1]]
         json.dump(final_vocab, f)
 
+
+def command_line(args=None):
+    parser = argparse.ArgumentParser(description='Combine word and BPE vocab', formatter_class=argparse.RawTextHelpFormatter)
+    define_parser(parser)
+    options = parser.parse_args(args)
+    run(options)
+
+
 if __name__ == "__main__":
-    main()
+    command_line()

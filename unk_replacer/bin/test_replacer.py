@@ -4,10 +4,10 @@ import json
 import os
 import logging
 
-from replacer.bpe.apply_bpe import BPE
-from replacer.word2vec import Word2Vec
-from replacer.collections import Trie
-from replacer.number_normalizer import NumberHandler
+from unk_replacer.bpe.apply_bpe import BPE
+from unk_replacer.word2vec import Word2Vec
+from unk_replacer.collections import Trie
+from unk_replacer.number_normalizer import NumberHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -225,8 +225,7 @@ class Replacer:
         return cls(emb=emb, voc=voc, bpe=bpe, memory=memory, sim_threshold=sim_threshold, backoff=backoff, too_common_threshold=too_common_threshold, mem_with_unk_only=not use_all_memory, force_word2vec_for_one_word=force_word2vec_for_one_word, handle_numbers=handle_numbers)
 
 
-def main(args=None):
-    parser = argparse.ArgumentParser(description='Replace training data')
+def define_parser(parser):
     parser.add_argument('--w2v-model', required=True, type=str, help='Path to source word2vec model')
     parser.add_argument('--w2v-model-topn', metavar='K', default=10, type=int,
                         help='Use top %(metavar)s most similar words from source word2vec')
@@ -254,8 +253,7 @@ def main(args=None):
     parser.add_argument('-n', '--handle-numbers', action='store_true', help='If set, apply special handling to numbers')
     parser.add_argument('-r', '--root-dir', required=True, help='Path to save artifacts')
 
-    options = parser.parse_args(args)
-
+def run(options):
     # write out command line options to a file in JSON format
     option_log_path = options.input + options.replaced_suffix + ".test_replacer.config.json"
     with open(option_log_path, "w") as option_log:
@@ -278,5 +276,13 @@ def main(args=None):
 
     replacer.replace_file(options.input, options.replaced_suffix, options.replace_log)
 
+
+def command_line(args=None):
+    parser = argparse.ArgumentParser(description='Replace training data')
+    define_parser(parser)
+    options = parser.parse_args(args)
+    run(options)
+
+
 if __name__ == "__main__":
-    main()
+    command_line()

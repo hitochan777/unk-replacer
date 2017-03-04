@@ -3,7 +3,7 @@ import re
 from typing import List
 import logging
 
-from replacer.lexical_dictionary import LexicalDictionary
+from unk_replacer.lexical_dictionary import LexicalDictionary
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

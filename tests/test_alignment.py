@@ -1,5 +1,5 @@
 from unittest import TestCase
-from replacer.alignment import Alignment
+from unk_replacer.alignment import Alignment
 
 
 class TestNumberHandler(TestCase):

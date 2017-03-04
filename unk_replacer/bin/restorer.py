@@ -5,8 +5,8 @@ from typing import List, Tuple
 from itertools import zip_longest
 import re
 
-from replacer.lexical_dictionary import LexicalDictionary
-from replacer.number_normalizer import NumberHandler, NumberRestorer
+from unk_replacer.lexical_dictionary import LexicalDictionary
+from unk_replacer.number_normalizer import NumberHandler, NumberRestorer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -454,8 +454,7 @@ class Restorer:
         return cls(lex_e2f, lex_f2e, memory, lex_backoff=lex_backoff, lex_top_n=lex_top_n, handle_numbers=handle_numbers, number_restorer=number_restorer, no_unk_rep=no_unk_rep)
 
 
-def main(args=None):
-    parser = argparse.ArgumentParser(description='Replace training data')
+def define_parser(parser):
     parser.add_argument('--translation', required=True, type=str, help='Path to translation')
     parser.add_argument('--orig-input', required=True, type=str, help='Path to original input')
     parser.add_argument('--replaced-input', required=True, type=str, help='Path to replaced input')
@@ -473,8 +472,8 @@ def main(args=None):
     parser.add_argument('--number-restorer', default="hankaku", choices=["zenkaku", "hankaku"], help='Restorer for numbers')
     parser.add_argument('--no-unk-rep', action='store_true', help='If set, do not replace UNK symbols in the translations')
 
-    options = parser.parse_args(args)
 
+def run(options):
     # write out command line options to a file in JSON format
     option_log_path = options.output + ".restore.config.json"
     with open(option_log_path, "w") as option_log:
@@ -491,5 +490,13 @@ def main(args=None):
 
     replacer.restore_file(options.translation, options.orig_input, options.replaced_input, options.output, options.attention, options.replace_log)
 
+
+def command_line(args=None):
+    parser = argparse.ArgumentParser(description='Restore the final translation', formatter_class=argparse.RawTextHelpFormatter)
+    define_parser(parser)
+    options = parser.parse_args(args)
+    run(options)
+
+
 if __name__ == "__main__":
-    main()
+    command_line()

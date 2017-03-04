@@ -11,11 +11,11 @@ import os
 import json
 from typing import Dict, List, Iterable, Union, Tuple
 
-from replacer.lexical_dictionary import LexicalDictionary
-from replacer.alignment import Alignment
-from replacer.bpe.apply_bpe import BPE
-from replacer.word2vec import Word2Vec
-from replacer.number_normalizer import NumberHandler
+from unk_replacer.lexical_dictionary import LexicalDictionary
+from unk_replacer.alignment import Alignment
+from unk_replacer.bpe.apply_bpe import BPE
+from unk_replacer.word2vec import Word2Vec
+from unk_replacer.number_normalizer import NumberHandler
 
 logger = logging.getLogger(__name__)
 
@@ -489,8 +489,7 @@ class Replacer:
                    handle_numbers=handle_numbers)
 
 
-def main(args=None):
-    parser = argparse.ArgumentParser(description='Replace training data', formatter_class=argparse.RawTextHelpFormatter)
+def define_parser(parser):
     parser.add_argument('--src-w2v-model', required=True, type=str, help='Path to source word2vec model')
     parser.add_argument('--src-w2v-lowercase', action='store_true', help='Lowercase words before querying src word2vec')
     parser.add_argument('--tgt-w2v-model', required=True, type=str, help='Path to target word2vec model')
@@ -527,8 +526,8 @@ def main(args=None):
     # TODO: add src-sim, tgt-sim, prob, threshold
     # TODO: add embedding vocab option
 
-    options = parser.parse_args(args)
 
+def run(options):
     replacer = Replacer.factory(src_w2v_model_path=options.src_w2v_model,
                                 src_w2v_lowercase=options.src_w2v_lowercase,
                                 tgt_w2v_model_path=options.tgt_w2v_model,
@@ -559,5 +558,12 @@ def main(args=None):
         logger.info("Finally writing replacement memory")
         replacer.export_memory(options.memory)
 
+
+def command_line(args=None):
+    parser = argparse.ArgumentParser(description='Replace training data', formatter_class=argparse.RawTextHelpFormatter)
+    define_parser(parser)
+    options = parser.parse_args(args)
+    run(options)
+
 if __name__ == "__main__":
-    main()
+    command_line()
