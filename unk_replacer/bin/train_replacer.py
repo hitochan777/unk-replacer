@@ -427,7 +427,7 @@ class Replacer:
     @classmethod
     def factory(cls, replace_type: str, store_memory: bool, src_w2v_model_path, tgt_w2v_model_path, src_w2v_model_topn,
                 lex_e2f_path, lex_f2e_path, lex_topn, voc_path, src_w2v_lowercase=False,
-                tgt_w2v_lowercase=False, src_bpe_code_path: str=None, tgt_bpe_code_path: str=None,
+                tgt_w2v_lowercase=False, bpe_vocab_path: str=None,
                 backoff: str="unk", handle_numbers: bool=False):
         logger.info("Loading vocabulary from %s" % voc_path)
         with open(voc_path, 'r') as f:
@@ -467,19 +467,18 @@ class Replacer:
         tgt_emb.set_vocab(filtered_tgt_voc)
 
         if backoff == "bpe":
-            assert src_bpe_code_path is not None
-            assert tgt_bpe_code_path is not None
-            logger.info("Loading source BPE codes from %s" % src_bpe_code_path)
-            with open(src_bpe_code_path, 'r') as f:
-                src_bpe = BPE(f, use_separator=True)
+            assert bpe_vocab_path is not None
+            logger.info("Loading BPE vocab from %s" % bpe_vocab_path)
+            with open(bpe_vocab_path, 'r') as f:
+                bpe_vocab = json.load(f)
+                src_bpe = BPE(bpe_vocab[0], use_separator=True)
                 logger.info("Vocab size of source BPE: %d", len(src_bpe.get_vocab()))
-
-            logger.info("Loading target BPE codes from %s" % tgt_bpe_code_path)
-            with open(tgt_bpe_code_path, 'r') as f:
-                tgt_bpe = BPE(f, use_separator=True)
+                tgt_bpe = BPE(bpe_vocab[1], use_separator=True)
                 logger.info("Vocab size of target BPE: %d", len(tgt_bpe.get_vocab()))
         elif backoff == "unk":
             src_bpe, tgt_bpe = None, None
+        else:
+            raise NotImplementedError()
 
         logger.info("Building Replacer instance")
         return cls(src_emb=src_emb, tgt_emb=tgt_emb, lex_e2f=lex_e2f,
@@ -510,8 +509,7 @@ def define_parser(parser):
     parser.add_argument('--replaced-suffix', default='', type=str,
                         help='Suffix for newly created training and dev data')
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
-    parser.add_argument('--src-bpe-code', default=None, type=str, help='Path to source BPE code')
-    parser.add_argument('--tgt-bpe-code', default=None, type=str, help='Path to target BPE code')
+    parser.add_argument('--bpe-vocab', default=None, type=str, help='Path to source BPE vocab')
     parser.add_argument('--memory', type=str, help='Save path to replacement memory', default=None)
     parser.add_argument('--backoff', choices=['bpe', 'unk'], default='unk', metavar='BACKOFF',
                         help='Use %(metavar)s for null aligned unknown words or unknown words in many-to-many links')
@@ -537,8 +535,7 @@ def run(options):
                                 lex_f2e_path=options.lex_f2e,
                                 lex_topn=options.lex_topn,
                                 voc_path=options.vocab,
-                                src_bpe_code_path=options.src_bpe_code,
-                                tgt_bpe_code_path=options.tgt_bpe_code,
+                                bpe_vocab_path=options.bpe_vocab,
                                 backoff=options.backoff,
                                 replace_type=options.replace_type,
                                 store_memory=options.memory is not None,

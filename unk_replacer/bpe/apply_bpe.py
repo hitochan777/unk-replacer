@@ -19,18 +19,15 @@ logger = logging.getLogger(__name__)
 
 class BPE(object):
 
-    def __init__(self, codes, separator='@@', use_separator=False, unk_symbol="<unk>", eow="</w>"):
+    def __init__(self, vocab, separator='@@', use_separator=False, unk_symbol="<unk>", eow="</w>"):
         
         self.bpe_codes = []
         self.bpe_subwords = set()
-        with open(codes.name) as codes:
-            logger.info("Loading BPE codes from %s" % (codes.name))
-            for item in codes:
-                item = item.strip(" \t\n").split(" ")
-                if len(item) == 2:
-                    self.bpe_codes.append(tuple(item))
+        for item in vocab:
+            if len(item) == 2:
+                self.bpe_codes.append(tuple(item))
 
-                self.bpe_subwords.add(''.join(item))
+            self.bpe_subwords.add(''.join(item))
 
         # some hacking to deal with duplicates (only consider first instance)
         self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
