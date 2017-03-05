@@ -63,7 +63,7 @@ unk-rep replace-parallel -h
    which is a supervised alignment model rather than GIZA++, 
    because it produces much better alignment.
 
-2. Train source and target Word2vec models
+3. Train source and target Word2vec models
    
    For example, you can use `gensim` module to train a word2vec model from `TRAIN`
    and save it to `MODEL_NAME`.
@@ -81,7 +81,7 @@ unk-rep replace-parallel -h
    python -m gensim.models.word2vec -h
    ```
 
-3. Replace unknown words in the training data with the
+4. Replace unknown words in the training data with the
     following command.
    
     ```bash
@@ -98,16 +98,20 @@ unk-rep replace-parallel -h
         --memory /path/to/save/replacement/memory \
         --replace-type multi
     ```
+    
+    The file for the source-to-target dictionary should contain `target source probability` for each line.
 
     If you also want to replace unknown words in **development data**,
     you can specify the paths to the source development data (`--dev-src`), target development data (`--dev-tgt`), 
     word alignment (`--dev-align`).
     
     If you want to replace unknown words in one-to-one alignment only, you can set `--replace-type` to `1-to-1`.
+    
+    You can set `--handle-numbers` if you want to apply special handling to numbers.   
 
-4. Train NMT model with the replaced training data from step 3
+5. Train NMT model with the replaced training data from step 3
 
-5. Replace unknown words in the test data with the following command.
+6. Replace unknown words in the test data with the following command.
 
     ```bash
     unk-rep replace-input \
@@ -117,13 +121,18 @@ unk-rep replace-parallel -h
         --vocab /path/to/json/vocab/file \
         --replace-log /path/to/save/replace/log/file
     ```
+    A replace log keeps track of which parts of an original sentence
+    map to the replaced input sentence.
+    This log is necessary to restore the final translation.
+    
+    You can set `--handle-numbers` if you want to apply special handling to numbers.
 
-6. Translate the replaced test data with the trained NMT model.
+7. Translate the replaced test data with the trained NMT model.
 
     We recommend that you ensemble several models because it normally
     leads to the better attention.
 
-7. Restore the final translation with the following command.
+8. Restore the final translation with the following command.
 
     ```bash
     unk-rep restore \
@@ -138,4 +147,87 @@ unk-rep replace-parallel -h
         --lex-backoff
     ```
     
+    `--lex-backoff` enables the use of the lexical translation tables
+    when the replacement memory does not contain the queried entry.
+    We recommend that you enable this.
+    
+    JSON file is supported for attention.
+    It should look like
+    ```json
+    [
+       [
+          [0.2, 0.4, ..., 0.2],
+          [0.5, 0.1, ..., 0.01],
+                  ...
+          [0.04, 0.3, ..., 0.2]
+       ],
+       ...
+       [
+           ... 
+       ]
+    ]
+    ```
+    , where it contains a list of attention for all input sentences. 
+    Alternatively, you can specify the file obtained by `--rich_output_filename` in `knmt`.
+    You can set `--handle-numbers` if you want to apply special handling to numbers.
+    
 ## Advanced Usage
+
+### Hybrid of BPE and Replacement Based Method
+
+You can also choose to use BPE to segment unknown words
+that are not handled by the replacement based method.
+
+**Note: You cannot apply special handling of numbers if you use BPE as a backoff!**
+
+1. Build word and BPE vocabulary
+    You first build word and BPE vocabulary separately.
+    You can first build word vocabulary with the aforementioned command.
+    To build BPE vocabulary you can use the following command.
+    ```bash
+    unk-rep build-vocab \
+        bpe \
+        --source-file /path/to/source/training/data \
+        --target-file /path/to/target/training/data \
+        --src-vocab-size 50000 \
+        --tgt-vocab-size 50000 \
+        --output-file /path/to/bpe/vocab/file
+    ```
+
+2. Combine word and BPE vocabulary
+    Assuming that you already have word vocabulary saved in `/path/to/word/vocab/file`,
+    combine word and BPE vocabulary with the following command.
+    ```bash
+    unk-rep co \
+        --bpe-voc /path/to/bpe/vocab/file \
+        --word-voc /path/to/word/vocab/file \
+        --output /path/to/combined/vocab/file \
+    ```
+    
+3. Replace unknown words in the training data with the
+    following command.
+    
+    ```
+    unk-rep replace-parallel \
+        ...
+        --vocab /path/to/combined/vocab/file \
+        --memory /path/to/save/replacement/memory \
+        --replace-type multi \
+        --back-off bpe
+    ```
+    You need to set `--back-off` to `bpe`.
+    
+4. Translate the replaced input
+
+5. Replace unknown words in the test data with the following command.
+
+    ```bash
+    unk-rep replace-input \
+        ...
+        --back-off bpe
+    ```
+    You need to set `--back-off` to `bpe`.
+
+6. Translate the replaced test data with the trained NMT model.
+
+7. Restore the final translation with `unk-rep restore` like the basic usage.
