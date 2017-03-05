@@ -192,7 +192,7 @@ class Replacer:
     @classmethod
     def factory(cls, w2v_model_path: str, w2v_model_topn: str,
                 voc_path: str, memory: str=None, w2v_lowercase: bool=False, 
-                bpe_code_path: str=None, sim_threshold: float=0.5, emb_voc_size: int=10000,
+                bpe_vocab_path: str=None, sim_threshold: float=0.5, emb_voc_size: int=10000,
                 backoff: str="unk", too_common_threshold: int=5000,
                 use_all_memory: bool=False, memory_min_freq: int=1,
                 force_word2vec_for_one_word: bool=False, handle_numbers: bool=False):
@@ -214,10 +214,11 @@ class Replacer:
                 memory_list = json.load(f)
                 memory = cls.build_memory(memory_list, memory_min_freq, force_word2vec_for_one_word)  # type: Trie
 
-        if bpe_code_path is not None:
+        if bpe_vocab_path is not None:
             logger.info("Loading BPE codes")
-            with open(bpe_code_path, 'r') as f:
-                bpe = BPE(f, use_separator=True)
+            with open(bpe_vocab_path, 'r') as f:
+                bpe_vocab = json.load(f)
+                bpe = BPE(bpe_vocab[0], use_separator=True)
         else:
             bpe = None
         
@@ -235,7 +236,7 @@ def define_parser(parser):
     parser.add_argument('--w2v-lowercase',
                         action='store_true', help='Lowercase word before querying word2vec')
     parser.add_argument('--vocab', required=True, type=str, help='Path to vocabulary file')
-    parser.add_argument('--bpe-code', default=None, type=str, help='Path to source BPE code')
+    parser.add_argument('--bpe-vocab', default=None, type=str, help='Path to source BPE code')
     parser.add_argument('--memory', default=None, type=str, help='Path to replacement memory')
     parser.add_argument('--sim-threshold', default=0.5, type=float,
                         help='Threshold value for source cosine similarity')
@@ -263,7 +264,7 @@ def run(options):
                                 w2v_model_topn=options.w2v_model_topn,
                                 w2v_lowercase=options.w2v_lowercase,
                                 voc_path=options.vocab,
-                                bpe_code_path=options.bpe_code,
+                                bpe_vocab_path=options.bpe_vocab,
                                 emb_voc_size=options.emb_vocab_size,
                                 sim_threshold=options.sim_threshold,
                                 memory=options.memory,

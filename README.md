@@ -213,6 +213,7 @@ that are not handled by the replacement based method.
         --vocab /path/to/combined/vocab/file \
         --memory /path/to/save/replacement/memory \
         --replace-type multi \
+        --bpe-vocab /path/to/bpe/vocab/file
         --back-off bpe
     ```
     You need to set `--back-off` to `bpe`.
@@ -224,6 +225,7 @@ that are not handled by the replacement based method.
     ```bash
     unk-rep replace-input \
         ...
+        --bpe-vocab /path/to/bpe/vocab/file
         --back-off bpe
     ```
     You need to set `--back-off` to `bpe`.
