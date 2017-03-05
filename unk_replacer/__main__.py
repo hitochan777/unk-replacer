@@ -42,7 +42,7 @@ def main(arguments=None):
     build_vocab.define_parser(parser_build_vocab)
 
     # create the parser for the "combine-word-and-bpe-vocab" command
-    parser_combine_vocab = subparsers.add_parser('combinie-word-and-bpe-vocab', description= "Build", help="Combine word and BPE vocab", formatter_class=argparse.ArgumentDefaultsHelpFormatter, aliases=['co'])
+    parser_combine_vocab = subparsers.add_parser('combine-word-and-bpe-vocab', description= "Build", help="Combine word and BPE vocab", formatter_class=argparse.ArgumentDefaultsHelpFormatter, aliases=['co'])
     combine_bpe_word_vocab.define_parser(parser_combine_vocab)
 
 

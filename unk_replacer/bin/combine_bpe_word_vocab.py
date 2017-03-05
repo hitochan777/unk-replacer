@@ -17,18 +17,18 @@ def run(options):
     bpe_src_voc = []
     bpe_tgt_voc = []
     with open(options.bpe_voc) as bpe_voc:
-        bpe_voc = json.load(bpe_voc_fs)
-        for s1, s2 in bpe_voc[0]:
-            if s2.endswith("</w>"):
-                bpe_src_voc.append(s1 + s2)
+        bpe_voc = json.load(bpe_voc)
+        for s in bpe_voc[0]:
+            if s[-1].endswith("</w>"):
+                bpe_src_voc.append("".join(s))
             else:
-                bpe_src_voc.append(s1 + s2 + options.separator)
+                bpe_src_voc.append("".join(s) + options.separator)
 
-        for s1, s2 in bpe_voc[1]:
-            if s2.endswith("</w>"):
-                bpe_tgt_voc.append(s1 + s2)
+        for s in bpe_voc[1]:
+            if s[-1].endswith("</w>"):
+                bpe_tgt_voc.append("".join(s))
             else:
-                bpe_tgt_voc.append(s1 + s2 + options.separator)
+                bpe_tgt_voc.append("".join(s) + options.separator)
 
     with open(options.word_voc) as f:
         word_voc = json.load(f)

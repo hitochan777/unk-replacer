@@ -198,7 +198,7 @@ that are not handled by the replacement based method.
     Assuming that you already have word vocabulary saved in `/path/to/word/vocab/file`,
     combine word and BPE vocabulary with the following command.
     ```bash
-    unk-rep co \
+    unk-rep combine-word-and-bpe-vocab \
         --bpe-voc /path/to/bpe/vocab/file \
         --word-voc /path/to/word/vocab/file \
         --output /path/to/combined/vocab/file \
