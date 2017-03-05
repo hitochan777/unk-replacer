@@ -4,8 +4,7 @@ from os import path
 
 
 def define_parser(parser):
-    parser.add_argument('--bpe-src-voc', required=True, type=str, help='Path to source BPE vocab file')
-    parser.add_argument('--bpe-tgt-voc', required=True, type=str, help='Path to target BPE vocab file')
+    parser.add_argument('--bpe-voc', required=True, type=str, help='Path to BPE vocab file in json format')
     parser.add_argument('--word-voc', required=True, type=str, help='Path to word vocab file in json format')
     parser.add_argument('--output', required=True, type=str, help="Path to output vocab file")
     parser.add_argument('--separator', default="@@", type=str, help="Separator for BPE")
@@ -17,21 +16,19 @@ def run(options):
 
     bpe_src_voc = []
     bpe_tgt_voc = []
-    with open(options.bpe_src_voc) as lines:
-        for line in lines:
-            rule = line.strip(" \t\n").split(" ")
-            if rule[-1].endswith("</w>"):
-                bpe_src_voc.append("".join(rule))
+    with open(options.bpe_voc) as bpe_voc:
+        bpe_voc = json.load(bpe_voc_fs)
+        for s1, s2 in bpe_voc[0]:
+            if s2.endswith("</w>"):
+                bpe_src_voc.append(s1 + s2)
             else:
-                bpe_src_voc.append("".join(rule) + options.separator)
+                bpe_src_voc.append(s1 + s2 + options.separator)
 
-    with open(options.bpe_tgt_voc) as lines:
-        for line in lines:
-            rule = line.strip(" \t\n").split(" ")
-            if rule[-1].endswith("</w>"):
-                bpe_tgt_voc.append("".join(rule))
+        for s1, s2 in bpe_voc[1]:
+            if s2.endswith("</w>"):
+                bpe_tgt_voc.append(s1 + s2)
             else:
-                bpe_tgt_voc.append("".join(rule) + options.separator)
+                bpe_tgt_voc.append(s1 + s2 + options.separator)
 
     with open(options.word_voc) as f:
         word_voc = json.load(f)

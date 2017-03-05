@@ -23,7 +23,7 @@ class Restorer:
         self.attention_threshold = attention_threshold
 
         if lex_backoff:
-            logger.info("Lexical table backoff is True")
+            logger.debug("Lexical table backoff is True")
 
         self.lex_backoff = lex_backoff
         self.lex_top_n = lex_top_n
@@ -37,9 +37,9 @@ class Restorer:
         self.handle_numbers = handle_numbers
 
         if self.handle_numbers:
-            logger.info('number handling is ON')
+            logger.debug('number handling is ON')
         else:
-            logger.info('number handling is OFF')
+            logger.debug('number handling is OFF')
 
         if number_restorer == "hankaku":
             self.number_restorer = NumberRestorer.restore_to_hankaku
@@ -50,7 +50,7 @@ class Restorer:
 
         self.no_unk_rep = no_unk_rep
         if self.no_unk_rep:
-            logger.info("Not replacing UNK symbols")
+            logger.debug("Not replacing UNK symbols")
 
     def print_statistics(self):
         print("Statistics:")
@@ -81,7 +81,7 @@ class Restorer:
                     print("" ,file=output)
 
                 if (index + 1) % self.print_every == 0:
-                    logger.info("Finished processing up to %d-th line" % (index + 1, ))
+                    logger.debug("Finished processing up to %d-th line" % (index + 1, ))
 
             self.print_statistics()
 
@@ -118,7 +118,7 @@ class Restorer:
             if ("#T_UNK_%d#" % f_index) == translation[eIndex]:
                 max_score = float('inf')  # any number > -inf suffices
                 e_index_with_max_score = eIndex
-                logger.info("replaced word %s was traslated to UNK symbol" % replaced_src_word)
+                logger.debug("replaced word %s was traslated to UNK symbol" % replaced_src_word)
                 break
 
             if attention_prob < self.attention_threshold:
@@ -164,16 +164,16 @@ class Restorer:
                             if orig_src_seq in dic:
                                 best_word = dic[orig_src_seq][0]  # choose the first one for now
                                 recovered_translation[e_index_with_max_score] = best_word
-                                logger.info("[1:memory] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                                logger.debug("[1:memory] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                                 assert type(best_word) == str, best_word
                                 return
 
-                        logger.info("%s not found in the memory" % orig_src_seq)
+                        logger.debug("%s not found in the memory" % orig_src_seq)
 
                     if orig_src_seq_len == 1:
                         best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
                         if in_dict:
-                            logger.info("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                            logger.debug("[1:dic] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
                             recovered_translation[e_index_with_max_score] = best_word
                             return
 
@@ -184,7 +184,7 @@ class Restorer:
                     best_word = orig_src_seq
 
                 recovered_translation[e_index_with_max_score] = best_word
-                logger.info("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
+                logger.debug("[1:copy] %s ➔ %s" % (translation[e_index_with_max_score], best_word))
 
                 return
 
@@ -204,7 +204,7 @@ class Restorer:
                     prob_threshold=self.prob_threshold
                 )
             else:
-                logger.info("%s not in the replacement memory." % replaced_src_word)
+                logger.debug("%s not in the replacement memory." % replaced_src_word)
                 candidates_replaced_src = []
 
         if not (self.handle_numbers and replaced_src_word in ["<@num:2d>","<@num:3d>","<@num:4d>", "<@num:big>"]):
@@ -231,7 +231,7 @@ class Restorer:
                         assert orig_src_seq_len == 1
                         best_word, in_dict = self.get_best_lexical_translation(orig_src_seq)
                         if in_dict:
-                            logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
+                            logger.debug("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
                             recovered_translation[best_index] = best_word
                             is_recovered[best_index] = True
                             self.count_back_substitute += 1
@@ -245,7 +245,7 @@ class Restorer:
                                 recovered_translation[best_index] = best_word
                                 is_recovered[best_index] = True
                                 self.count_back_substitute += 1
-                                logger.info("[2:memory] %s ➔ %s" % (translation[best_index], best_word))
+                                logger.debug("[2:memory] %s ➔ %s" % (translation[best_index], best_word))
                                 return
 
                         if self.lex_backoff and orig_src_seq_len == 1:
@@ -254,17 +254,17 @@ class Restorer:
                                 recovered_translation[best_index] = best_word
                                 is_recovered[best_index] = True
                                 self.count_back_substitute += 1
-                                logger.info("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
+                                logger.debug("[2:dict] %s ➔ %s" % (translation[best_index], best_word))
                                 return
 
                     self.nb_no_dic_entry += 1
-                    logger.info("[2:copy] %s ➔ %s" % (translation[best_index], orig_src_seq))
+                    logger.debug("[2:copy] %s ➔ %s" % (translation[best_index], orig_src_seq))
                     recovered_translation[best_index] = orig_src_seq
                     is_recovered[best_index] = True
                     self.count_back_substitute += 1
                     return
             else:
-                logger.info("Not replaced")
+                logger.debug("Not replaced")
         else:
             indices = [
                 index for index, word in enumerate(recovered_translation)
@@ -284,13 +284,13 @@ class Restorer:
                     return
 
                 self.nb_no_dic_entry += 1
-                logger.info("[2:copy] %s ➔ %s" % (translation[best_index], self.number_restorer(orig_src_seq)))
+                logger.debug("[2:copy] %s ➔ %s" % (translation[best_index], self.number_restorer(orig_src_seq)))
                 recovered_translation[best_index] = self.number_restorer(orig_src_seq)
                 is_recovered[best_index] = True
                 self.count_back_substitute += 1
                 return
             else:
-                logger.info("Not replaced")
+                logger.debug("Not replaced")
                 return
 
         return
@@ -330,7 +330,7 @@ class Restorer:
             orig_src_seq = ' '.join(orig_src[fIndices_before[0]:fIndices_before[-1] + 1])
             f_index = fIndices_after[0]
             if replaced_src[f_index] == "<@UNK>":
-                logger.info("Skipping <@UNK>")
+                logger.debug("Skipping <@UNK>")
                 continue
 
             if self.handle_numbers and replaced_src[f_index] in ["<@num:%d>" % i for i in range(13)]:
@@ -394,7 +394,7 @@ class Restorer:
             f_index = int(m.group("f_index"))
             if self.handle_numbers:
                 if f_index not in orig_idx_dic:
-                    logger.info("Not restoring because %s (%d-th word) is aligned to a number token" % (translation[index], index))
+                    logger.debug("Not restoring because %s (%d-th word) is aligned to a number token" % (translation[index], index))
                     continue
             else:
                 if f_index not in orig_idx_dic:
